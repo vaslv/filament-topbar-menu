@@ -242,4 +242,4 @@ composer test
 
 ## License
 
-The MIT License (MIT). See [LICENSE.md](LICENSE.md).
+The MIT License (MIT). See [LICENSE](LICENSE).
