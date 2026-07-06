@@ -15,7 +15,7 @@ class TopbarMenuPlugin implements Plugin
 
     protected string $renderHook = PanelsRenderHook::TOPBAR_LOGO_AFTER;
 
-    protected string | UnitEnum | null $resourceNavigationGroup = null;
+    protected string|UnitEnum|null $resourceNavigationGroup = null;
 
     protected ?int $resourceNavigationSort = null;
 
@@ -47,10 +47,15 @@ class TopbarMenuPlugin implements Plugin
 
         $panel->renderHook(
             $this->renderHook,
-            fn (): View => view('filament-topbar-menu::menu', [
-                'items' => app(TopbarMenu::class)->visibleItems($user = filament()->auth()->user()),
-                'user' => $user,
-            ]),
+            function (): View {
+                $user = filament()->auth()->user();
+
+                // @phpstan-ignore argument.type (the namespaced package view is valid at runtime; PHPStan can't resolve package view-strings)
+                return view('filament-topbar-menu::menu', [
+                    'items' => app(TopbarMenu::class)->visibleItems($user),
+                    'user' => $user,
+                ]);
+            },
         );
     }
 
@@ -80,7 +85,7 @@ class TopbarMenuPlugin implements Plugin
         return $this;
     }
 
-    public function resourceNavigationGroup(string | UnitEnum | null $group): static
+    public function resourceNavigationGroup(string|UnitEnum|null $group): static
     {
         $this->resourceNavigationGroup = $group;
 
@@ -94,7 +99,7 @@ class TopbarMenuPlugin implements Plugin
         return $this;
     }
 
-    public function getResourceNavigationGroup(): string | UnitEnum | null
+    public function getResourceNavigationGroup(): string|UnitEnum|null
     {
         return $this->resourceNavigationGroup;
     }

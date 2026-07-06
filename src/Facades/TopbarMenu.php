@@ -5,8 +5,8 @@ namespace Vaslv\FilamentTopbarMenu\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @method static \Illuminate\Database\Eloquent\Collection items()
- * @method static \Illuminate\Database\Eloquent\Collection visibleItems(?\Illuminate\Contracts\Auth\Authenticatable $user = null)
+ * @method static \Illuminate\Database\Eloquent\Collection<int, \Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem> items()
+ * @method static \Illuminate\Database\Eloquent\Collection<int, \Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem> visibleItems(?\Illuminate\Contracts\Auth\Authenticatable $user = null)
  * @method static void flushCache()
  * @method static string cacheKey()
  *

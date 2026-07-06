@@ -36,7 +36,7 @@ class TranslationTest extends TestCase
             return $keys;
         };
 
-        $langPath = __DIR__ . '/../resources/lang';
+        $langPath = __DIR__.'/../resources/lang';
         $reference = $flatten(require "{$langPath}/en/filament-topbar-menu.php");
         sort($reference);
 

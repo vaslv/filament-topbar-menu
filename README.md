@@ -262,11 +262,18 @@ They are published to `lang/vendor/filament-topbar-menu/{locale}/filament-topbar
 To add a new language, copy the `en` file to a new locale folder (e.g. `it/`) and
 translate the values.
 
-## Testing
+## Testing & code quality
 
 ```bash
-composer test
+composer test        # PHPUnit
+composer lint         # apply Laravel Pint code style
+composer lint:test    # check code style without changing files
+composer analyse      # PHPStan (level 6, via Larastan)
+composer check        # lint:test + analyse + test (what CI runs)
 ```
+
+CI runs the full test matrix (PHP 8.2 / 8.3 / 8.4) plus a code-quality job
+(Pint + PHPStan) on every push and pull request.
 
 ## License
 

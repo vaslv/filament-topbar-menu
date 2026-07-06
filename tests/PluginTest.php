@@ -2,8 +2,26 @@
 
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
+use Filament\Actions\ActionsServiceProvider;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\FilamentServiceProvider;
+use Filament\Forms\FormsServiceProvider;
+use Filament\Infolists\InfolistsServiceProvider;
+use Filament\Notifications\NotificationsServiceProvider;
 use Filament\Panel;
+use Filament\Schemas\Concerns\InteractsWithSchemas;
+use Filament\Schemas\Contracts\HasSchemas;
+use Filament\Schemas\Schema;
+use Filament\Schemas\SchemasServiceProvider;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
+use Filament\Tables\TablesServiceProvider;
 use Filament\View\PanelsRenderHook;
+use Filament\Widgets\WidgetsServiceProvider;
+use Illuminate\Support\Facades\Cache;
+use Livewire\Component;
 use ReflectionProperty;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
@@ -15,14 +33,14 @@ class PluginTest extends TestCase
     protected function getPackageProviders($app): array
     {
         return array_merge(parent::getPackageProviders($app), [
-            \Filament\Actions\ActionsServiceProvider::class,
-            \Filament\Forms\FormsServiceProvider::class,
-            \Filament\Infolists\InfolistsServiceProvider::class,
-            \Filament\Notifications\NotificationsServiceProvider::class,
-            \Filament\Schemas\SchemasServiceProvider::class,
-            \Filament\Tables\TablesServiceProvider::class,
-            \Filament\Widgets\WidgetsServiceProvider::class,
-            \Filament\FilamentServiceProvider::class,
+            ActionsServiceProvider::class,
+            FormsServiceProvider::class,
+            InfolistsServiceProvider::class,
+            NotificationsServiceProvider::class,
+            SchemasServiceProvider::class,
+            TablesServiceProvider::class,
+            WidgetsServiceProvider::class,
+            FilamentServiceProvider::class,
         ]);
     }
 
@@ -64,15 +82,15 @@ class PluginTest extends TestCase
 
     public function test_the_resource_form_and_table_definitions_build(): void
     {
-        $schema = TopbarMenuItemResource::form(\Filament\Schemas\Schema::make());
+        $schema = TopbarMenuItemResource::form(Schema::make());
 
         $this->assertNotEmpty($schema->getComponents());
 
-        $livewire = new class extends \Livewire\Component implements \Filament\Actions\Contracts\HasActions, \Filament\Schemas\Contracts\HasSchemas, \Filament\Tables\Contracts\HasTable
+        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
         {
-            use \Filament\Actions\Concerns\InteractsWithActions;
-            use \Filament\Schemas\Concerns\InteractsWithSchemas;
-            use \Filament\Tables\Concerns\InteractsWithTable;
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+            use InteractsWithTable;
 
             public function render(): string
             {
@@ -80,7 +98,7 @@ class PluginTest extends TestCase
             }
         };
 
-        $table = TopbarMenuItemResource::table(\Filament\Tables\Table::make($livewire));
+        $table = TopbarMenuItemResource::table(Table::make($livewire));
 
         $this->assertNotEmpty($table->getColumns());
         $this->assertSame('sort', $table->getReorderColumn());
@@ -91,11 +109,11 @@ class PluginTest extends TestCase
         TopbarMenuItem::create(['label' => 'A', 'type' => 'url', 'url' => '/a', 'sort' => 0]);
         TopbarMenuItem::create(['label' => 'B', 'type' => 'url', 'url' => '/b', 'sort' => 1]);
 
-        $livewire = new class extends \Livewire\Component implements \Filament\Actions\Contracts\HasActions, \Filament\Schemas\Contracts\HasSchemas, \Filament\Tables\Contracts\HasTable
+        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
         {
-            use \Filament\Actions\Concerns\InteractsWithActions;
-            use \Filament\Schemas\Concerns\InteractsWithSchemas;
-            use \Filament\Tables\Concerns\InteractsWithTable;
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+            use InteractsWithTable;
 
             public function render(): string
             {
@@ -103,15 +121,15 @@ class PluginTest extends TestCase
             }
         };
 
-        $table = TopbarMenuItemResource::table(\Filament\Tables\Table::make($livewire));
+        $table = TopbarMenuItemResource::table(Table::make($livewire));
 
         // Prime the cache, then simulate Filament's post-reorder callback.
         app(TopbarMenu::class)->items();
-        $this->assertTrue(\Illuminate\Support\Facades\Cache::has(app(TopbarMenu::class)->cacheKey()));
+        $this->assertTrue(Cache::has(app(TopbarMenu::class)->cacheKey()));
 
         $table->callAfterReordering(['2', '1']);
 
-        $this->assertFalse(\Illuminate\Support\Facades\Cache::has(app(TopbarMenu::class)->cacheKey()));
+        $this->assertFalse(Cache::has(app(TopbarMenu::class)->cacheKey()));
     }
 
     public function test_the_menu_view_renders_items_dropdowns_and_favicons(): void

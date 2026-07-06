@@ -38,7 +38,7 @@ class TopbarMenuItemResource extends Resource
 {
     protected static ?string $model = TopbarMenuItem::class;
 
-    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-bars-3-bottom-left';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bars-3-bottom-left';
 
     public static function getModelLabel(): string
     {
@@ -55,7 +55,7 @@ class TopbarMenuItemResource extends Resource
         return static::trans('labels.navigation');
     }
 
-    public static function getNavigationGroup(): string | UnitEnum | null
+    public static function getNavigationGroup(): string|UnitEnum|null
     {
         return static::plugin()?->getResourceNavigationGroup() ?? parent::getNavigationGroup();
     }
@@ -67,6 +67,8 @@ class TopbarMenuItemResource extends Resource
 
     /**
      * Short helper for the package's translation namespace.
+     *
+     * @param  array<string, mixed>  $replace
      */
     protected static function trans(string $key, array $replace = []): string
     {
@@ -271,7 +273,7 @@ class TopbarMenuItemResource extends Resource
                     ->label(static::trans('columns.target'))
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (string $state): string => static::trans('fields.target.options.' . ($state === TopbarMenuItem::TARGET_BLANK ? 'blank' : 'self')))
+                    ->formatStateUsing(fn (string $state): string => static::trans('fields.target.options.'.($state === TopbarMenuItem::TARGET_BLANK ? 'blank' : 'self')))
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 ToggleColumn::make('is_active')
@@ -341,6 +343,7 @@ class TopbarMenuItemResource extends Resource
                             $resolver = app(FaviconResolver::class);
                             $resolved = 0;
 
+                            /** @var TopbarMenuItem $record */
                             foreach ($records as $record) {
                                 if ($record->type !== TopbarMenuItem::TYPE_URL || blank($record->url)) {
                                     continue;

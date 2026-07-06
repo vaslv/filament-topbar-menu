@@ -9,9 +9,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Routing\Exceptions\UrlGenerationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
 
+/**
+ * @property int $id
+ * @property int|null $parent_id
+ * @property string $label
+ * @property string $type
+ * @property string|null $url
+ * @property string|null $route
+ * @property array<string, mixed>|null $route_parameters
+ * @property string $target
+ * @property string|null $icon
+ * @property string|null $favicon_url
+ * @property bool $is_active
+ * @property int $sort
+ * @property array<string, mixed>|null $visibility
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read TopbarMenuItem|null $parent
+ * @property-read Collection<int, TopbarMenuItem> $children
+ * @property-read Collection<int, TopbarMenuItem> $activeChildren
+ */
 class TopbarMenuItem extends Model
 {
     public const TYPE_URL = 'url';
@@ -44,6 +65,9 @@ class TopbarMenuItem extends Model
         'sort' => 0,
     ];
 
+    /**
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
@@ -67,31 +91,52 @@ class TopbarMenuItem extends Model
         static::deleted($flushCache);
     }
 
+    /**
+     * @return BelongsTo<TopbarMenuItem, $this>
+     */
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(static::class, 'parent_id');
+        return $this->belongsTo(self::class, 'parent_id');
     }
 
+    /**
+     * @return HasMany<TopbarMenuItem, $this>
+     */
     public function children(): HasMany
     {
-        return $this->hasMany(static::class, 'parent_id');
+        return $this->hasMany(self::class, 'parent_id');
     }
 
+    /**
+     * @return HasMany<TopbarMenuItem, $this>
+     */
     public function activeChildren(): HasMany
     {
         return $this->children()->active()->ordered();
     }
 
+    /**
+     * @param  Builder<TopbarMenuItem>  $query
+     * @return Builder<TopbarMenuItem>
+     */
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
 
+    /**
+     * @param  Builder<TopbarMenuItem>  $query
+     * @return Builder<TopbarMenuItem>
+     */
     public function scopeRoot(Builder $query): Builder
     {
         return $query->whereNull('parent_id');
     }
 
+    /**
+     * @param  Builder<TopbarMenuItem>  $query
+     * @return Builder<TopbarMenuItem>
+     */
     public function scopeOrdered(Builder $query): Builder
     {
         return $query->orderBy('sort')->orderBy('id');
@@ -174,6 +219,9 @@ class TopbarMenuItem extends Model
         return true;
     }
 
+    /**
+     * @return Collection<int, TopbarMenuItem>
+     */
     public function visibleChildren(?Authenticatable $user = null): Collection
     {
         return $this->activeChildren
@@ -185,6 +233,8 @@ class TopbarMenuItem extends Model
      * The audience mode ('auth' | 'guest' | null) represented by a visibility
      * array. Used by the resource form's visibility Select. Keys other than
      * `auth`/`guest` (e.g. `roles`) do not map to a mode and are ignored here.
+     *
+     * @param  array<string, mixed>|null  $visibility
      */
     public static function visibilityModeFromArray(?array $visibility): ?string
     {
@@ -200,6 +250,9 @@ class TopbarMenuItem extends Model
      * visibility array, preserving every other key (notably `roles`) so that
      * editing an item through the form never silently drops role restrictions.
      * Returns null when the resulting array is empty.
+     *
+     * @param  array<string, mixed>|null  $current
+     * @return array<string, mixed>|null
      */
     public static function applyVisibilityMode(?array $current, ?string $mode): ?array
     {

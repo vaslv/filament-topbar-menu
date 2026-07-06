@@ -2,6 +2,7 @@
 
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
+use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Vaslv\FilamentTopbarMenu\Facades\TopbarMenu;
@@ -114,7 +115,7 @@ class MenuCacheTest extends TestCase
 
         $this->assertSame(['Public'], TopbarMenu::visibleItems(null)->pluck('label')->all());
 
-        $user = new \Illuminate\Auth\GenericUser(['id' => 1]);
+        $user = new GenericUser(['id' => 1]);
 
         $this->assertSame(['Public', 'Members'], TopbarMenu::visibleItems($user)->pluck('label')->all());
     }

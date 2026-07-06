@@ -6,3 +6,4 @@ composer.lock
 .idea/
 .vscode/
 .DS_Store
+/.composer-cache/

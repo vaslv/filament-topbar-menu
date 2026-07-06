@@ -31,10 +31,10 @@ class FaviconResolver
         $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'https';
         $port = parse_url($url, PHP_URL_PORT);
 
-        $base = $scheme . '://' . $host . ($port ? ':' . $port : '');
+        $base = $scheme.'://'.$host.($port ? ':'.$port : '');
 
         // 1. The conventional location.
-        $faviconUrl = $base . '/favicon.ico';
+        $faviconUrl = $base.'/favicon.ico';
 
         if ($this->isValidFavicon($faviconUrl)) {
             return $faviconUrl;
@@ -131,22 +131,22 @@ class FaviconResolver
 
         // Scheme-relative: //cdn.example.com/icon.png
         if (str_starts_with($href, '//')) {
-            return $scheme . ':' . $href;
+            return $scheme.':'.$href;
         }
 
         $port = parse_url($pageUrl, PHP_URL_PORT);
-        $authority = $scheme . '://' . $host . ($port ? ':' . $port : '');
+        $authority = $scheme.'://'.$host.($port ? ':'.$port : '');
 
         // Root-relative: /icon.png
         if (str_starts_with($href, '/')) {
-            return $authority . $this->normalizePath($href);
+            return $authority.$this->normalizePath($href);
         }
 
         // Path-relative: resolve against the page's directory.
         $path = parse_url($pageUrl, PHP_URL_PATH) ?: '/';
         $directory = substr($path, 0, strrpos($path, '/') + 1) ?: '/';
 
-        return $authority . $this->normalizePath($directory . $href);
+        return $authority.$this->normalizePath($directory.$href);
     }
 
     /**
@@ -170,7 +170,7 @@ class FaviconResolver
             $segments[] = $segment;
         }
 
-        return '/' . implode('/', $segments);
+        return '/'.implode('/', $segments);
     }
 
     protected function request(string $url): ?Response
