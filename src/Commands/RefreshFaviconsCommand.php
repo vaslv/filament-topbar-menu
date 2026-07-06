@@ -3,6 +3,7 @@
 namespace Vaslv\FilamentTopbarMenu\Commands;
 
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 use Vaslv\FilamentTopbarMenu\Support\FaviconResolver;
 
@@ -45,7 +46,11 @@ class RefreshFaviconsCommand extends Command
         }
 
         $resolved = 0;
-        $notFound = __('filament-topbar-menu::filament-topbar-menu.command.not_found');
+        // Escaped because a published/custom translation could contain `<`/`>`,
+        // which would otherwise be parsed as Symfony console style tags.
+        $notFound = OutputFormatter::escape(
+            __('filament-topbar-menu::filament-topbar-menu.command.not_found'),
+        );
 
         foreach ($items as $item) {
             $favicon = $resolver->resolve($item->url);
