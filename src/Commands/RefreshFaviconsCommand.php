@@ -19,7 +19,7 @@ class RefreshFaviconsCommand extends Command
         if (! config('filament-topbar-menu.enable_favicons', true)) {
             // A no-op, not an error: the command is safe to leave in deploy
             // scripts and schedulers even when the feature is turned off.
-            $this->components->warn('Favicon resolution is disabled (filament-topbar-menu.enable_favicons); nothing to do.');
+            $this->components->warn(__('filament-topbar-menu::filament-topbar-menu.command.disabled'));
 
             return self::SUCCESS;
         }
@@ -39,18 +39,19 @@ class RefreshFaviconsCommand extends Command
         $items = $query->get();
 
         if ($items->isEmpty()) {
-            $this->components->info('No menu items need a favicon refresh.');
+            $this->components->info(__('filament-topbar-menu::filament-topbar-menu.command.nothing_to_refresh'));
 
             return self::SUCCESS;
         }
 
         $resolved = 0;
+        $notFound = __('filament-topbar-menu::filament-topbar-menu.command.not_found');
 
         foreach ($items as $item) {
             $favicon = $resolver->resolve($item->url);
 
             if ($favicon === null) {
-                $this->components->twoColumnDetail($item->label, '<fg=yellow>not found</>');
+                $this->components->twoColumnDetail($item->label, "<fg=yellow>{$notFound}</>");
 
                 continue;
             }
@@ -61,7 +62,10 @@ class RefreshFaviconsCommand extends Command
             $this->components->twoColumnDetail($item->label, $favicon);
         }
 
-        $this->components->info("Resolved {$resolved} of {$items->count()} favicon(s).");
+        $this->components->info(__('filament-topbar-menu::filament-topbar-menu.command.resolved_summary', [
+            'resolved' => $resolved,
+            'total' => $items->count(),
+        ]));
 
         return self::SUCCESS;
     }

@@ -121,58 +121,17 @@ class TopbarMenuItem extends Model
     }
 
     /**
-     * Build the final target of the item, taking the
-     * `open_external_links_in_new_tab` option into account.
+     * The link target. The per-item choice is authoritative: "Same tab"
+     * (_self) always opens in the same tab and "New tab" (_blank) always opens
+     * in a new one. The `open_external_links_in_new_tab` config only sets the
+     * default value of the target field for newly created items (see the
+     * resource form); it never overrides an explicit choice at render time.
      */
     public function resolveTarget(): string
     {
-        if ($this->target === self::TARGET_BLANK) {
-            return self::TARGET_BLANK;
-        }
-
-        if (
-            config('filament-topbar-menu.open_external_links_in_new_tab', true)
-            && $this->isExternalUrl()
-        ) {
-            return self::TARGET_BLANK;
-        }
-
-        return $this->target ?: self::TARGET_SELF;
-    }
-
-    public function isExternalUrl(): bool
-    {
-        if ($this->type !== self::TYPE_URL || blank($this->url)) {
-            return false;
-        }
-
-        $itemAuthority = static::normalizeAuthority($this->url);
-
-        if ($itemAuthority === null) {
-            return false;
-        }
-
-        return $itemAuthority !== static::normalizeAuthority((string) config('app.url'));
-    }
-
-    /**
-     * Normalize a URL to a comparable "host:port" authority: lower-cased host
-     * with the port made explicit (default 80/443 filled in from the scheme),
-     * so that letter case and default vs. explicit ports don't cause false
-     * external/internal classifications. Returns null for host-less URLs.
-     */
-    public static function normalizeAuthority(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (blank($host)) {
-            return null;
-        }
-
-        $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?: 'https'));
-        $port = parse_url($url, PHP_URL_PORT) ?: ($scheme === 'http' ? 80 : 443);
-
-        return strtolower($host) . ':' . $port;
+        return $this->target === self::TARGET_BLANK
+            ? self::TARGET_BLANK
+            : self::TARGET_SELF;
     }
 
     /**

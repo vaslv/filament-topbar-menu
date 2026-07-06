@@ -51,7 +51,7 @@
                                 aria-haspopup="true"
                                 x-bind:aria-expanded="open"
                             >
-                                <span class="fi-sr-only">{{ __('Toggle :label submenu', ['label' => $item->label]) }}</span>
+                                <span class="fi-sr-only">{{ __('filament-topbar-menu::filament-topbar-menu.menu.toggle_submenu', ['label' => $item->label]) }}</span>
                                 @include('filament-topbar-menu::partials.chevron')
                             </button>
                         @else

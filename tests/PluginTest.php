@@ -121,6 +121,7 @@ class PluginTest extends TestCase
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://services.example.com',
             'favicon_url' => 'https://services.example.com/favicon.ico',
+            'target' => TopbarMenuItem::TARGET_BLANK,
         ]);
 
         TopbarMenuItem::create([
@@ -128,6 +129,7 @@ class PluginTest extends TestCase
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://analytics.example.com',
             'parent_id' => $parent->id,
+            'target' => TopbarMenuItem::TARGET_SELF,
         ]);
 
         TopbarMenuItem::create([
@@ -153,8 +155,10 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('Analytics', $html);
         $this->assertStringNotContainsString('Hidden', $html);
 
-        // External links open in a new tab by default.
+        // The per-item target is honored: the "New tab" parent gets _blank
+        // (with rel), and the "Same tab" child is NOT promoted to a new tab.
         $this->assertStringContainsString('target="_blank"', $html);
+        $this->assertStringContainsString('target="_self"', $html);
         $this->assertStringContainsString('rel="noopener noreferrer"', $html);
 
         // The parent renders a dropdown with its child inside.

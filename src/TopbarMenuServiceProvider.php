@@ -21,6 +21,7 @@ class TopbarMenuServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'filament-topbar-menu');
+        $this->loadTranslationsFrom(__DIR__ . '/../resources/lang', 'filament-topbar-menu');
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         FilamentAsset::register([
@@ -43,6 +44,10 @@ class TopbarMenuServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../resources/views' => resource_path('views/vendor/filament-topbar-menu'),
             ], 'filament-topbar-menu-views');
+
+            $this->publishes([
+                __DIR__ . '/../resources/lang' => $this->app->langPath('vendor/filament-topbar-menu'),
+            ], 'filament-topbar-menu-translations');
         }
     }
 }

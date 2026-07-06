@@ -8,6 +8,7 @@ A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to 
 - ⚡ **Cached** — no database query on page render; the cache is flushed automatically on changes
 - 🛠️ **Full Filament resource** — create, edit, delete, drag-and-drop reordering, activate/deactivate
 - 🌙 **Filament-native look** — dark mode support, responsive dropdowns
+- 🌍 **Translatable** — ships with English, Russian, German, Spanish and French; add your own
 - 🪝 Rendered through the official `PanelsRenderHook::TOPBAR_LOGO_AFTER` render hook — no layout overrides
 
 ## Requirements
@@ -110,7 +111,7 @@ TopbarMenuItem::create([
 ]);
 ```
 
-With `open_external_links_in_new_tab` enabled (the default), links pointing to a different host open in a new tab even when their target is `_self`.
+The per-item **target** is authoritative: "Same tab" (`_self`) always opens in the same tab and "New tab" (`_blank`) always opens in a new one. The `open_external_links_in_new_tab` config only decides the *default* value of the target field when you create a new item in the resource (default: new tab) — it never overrides an explicit choice.
 
 ### Example: internal route links
 
@@ -210,6 +211,8 @@ return [
     'cache_ttl' => 3600,
     'enable_favicons' => true,
     'favicon_request_timeout' => 5,
+    // Default value of the target field for new items. The per-item choice
+    // ("Same tab" / "New tab") always wins at render time; this is only a default.
     'open_external_links_in_new_tab' => true,
 ];
 ```
@@ -233,6 +236,31 @@ php artisan vendor:publish --tag=filament-topbar-menu-views
 ```
 
 Views are published to `resources/views/vendor/filament-topbar-menu`.
+
+## Translations
+
+The entire interface (resource form, table, actions, notifications, the artisan
+command output and the menu's ARIA labels) is translatable. The package ships
+with:
+
+- English (`en`)
+- Russian (`ru`)
+- German (`de`)
+- Spanish (`es`)
+- French (`fr`)
+
+The language follows the application locale (`app()->setLocale(...)`), so nothing
+needs to be configured — set your app locale and the menu is translated.
+
+To add another language or tweak the wording, publish the translation files:
+
+```bash
+php artisan vendor:publish --tag=filament-topbar-menu-translations
+```
+
+They are published to `lang/vendor/filament-topbar-menu/{locale}/filament-topbar-menu.php`.
+To add a new language, copy the `en` file to a new locale folder (e.g. `it/`) and
+translate the values.
 
 ## Testing
 

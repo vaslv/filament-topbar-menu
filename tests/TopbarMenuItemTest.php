@@ -61,40 +61,40 @@ class TopbarMenuItemTest extends TestCase
         $this->assertNull($item->resolveUrl());
     }
 
-    public function test_external_links_open_in_a_new_tab_when_configured(): void
+    public function test_the_per_item_target_is_honored_literally(): void
     {
-        $external = TopbarMenuItem::create([
-            'label' => 'External',
+        // "Same tab" must always mean same tab — even for an external URL and
+        // even when open_external_links_in_new_tab is enabled. It must never be
+        // silently promoted to a new tab.
+        config()->set('filament-topbar-menu.open_external_links_in_new_tab', true);
+
+        $sameTab = TopbarMenuItem::create([
+            'label' => 'External, same tab',
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://other-service.com',
+            'target' => TopbarMenuItem::TARGET_SELF,
         ]);
 
-        $internal = TopbarMenuItem::create([
-            'label' => 'Internal',
-            'type' => TopbarMenuItem::TYPE_URL,
-            'url' => 'https://myapp.test/dashboard',
-        ]);
-
-        $this->assertSame('_blank', $external->resolveTarget());
-        $this->assertSame('_self', $internal->resolveTarget());
-
-        config()->set('filament-topbar-menu.open_external_links_in_new_tab', false);
-
-        $this->assertSame('_self', $external->resolveTarget());
-    }
-
-    public function test_explicit_blank_target_is_always_respected(): void
-    {
-        config()->set('filament-topbar-menu.open_external_links_in_new_tab', false);
-
-        $item = TopbarMenuItem::create([
-            'label' => 'External',
+        $newTab = TopbarMenuItem::create([
+            'label' => 'External, new tab',
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://other-service.com',
             'target' => TopbarMenuItem::TARGET_BLANK,
         ]);
 
-        $this->assertSame('_blank', $item->resolveTarget());
+        $this->assertSame('_self', $sameTab->resolveTarget());
+        $this->assertSame('_blank', $newTab->resolveTarget());
+    }
+
+    public function test_target_defaults_to_self_when_unset(): void
+    {
+        $item = new TopbarMenuItem([
+            'label' => 'No explicit target',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://other-service.com',
+        ]);
+
+        $this->assertSame('_self', $item->resolveTarget());
     }
 
     public function test_visibility_rules_are_evaluated_per_user(): void
@@ -113,31 +113,6 @@ class TopbarMenuItemTest extends TestCase
 
         $this->assertTrue($guestOnly->isVisibleTo(null));
         $this->assertFalse($guestOnly->isVisibleTo($user));
-    }
-
-    public function test_is_external_url_accounts_for_port_and_letter_case(): void
-    {
-        config()->set('app.url', 'http://localhost:8000');
-
-        $differentPort = new TopbarMenuItem(['type' => 'url', 'url' => 'http://localhost:3000']);
-        $samePort = new TopbarMenuItem(['type' => 'url', 'url' => 'http://localhost:8000/x']);
-        $mixedCase = new TopbarMenuItem(['type' => 'url', 'url' => 'http://LOCALHOST:8000/y']);
-
-        // Same host, different port -> external (a different local app).
-        $this->assertTrue($differentPort->isExternalUrl());
-        // Same host and port -> internal.
-        $this->assertFalse($samePort->isExternalUrl());
-        // Host differing only in case -> internal.
-        $this->assertFalse($mixedCase->isExternalUrl());
-    }
-
-    public function test_is_external_url_treats_default_and_explicit_ports_as_equal(): void
-    {
-        config()->set('app.url', 'https://example.com');
-
-        $explicit443 = new TopbarMenuItem(['type' => 'url', 'url' => 'https://example.com:443/dashboard']);
-
-        $this->assertFalse($explicit443->isExternalUrl());
     }
 
     public function test_visibility_mode_mapping_preserves_roles(): void

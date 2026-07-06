@@ -40,9 +40,20 @@ class TopbarMenuItemResource extends Resource
 
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-bars-3-bottom-left';
 
-    protected static ?string $modelLabel = 'Topbar Menu Item';
+    public static function getModelLabel(): string
+    {
+        return static::trans('labels.model');
+    }
 
-    protected static ?string $pluralModelLabel = 'Topbar Menu';
+    public static function getPluralModelLabel(): string
+    {
+        return static::trans('labels.plural_model');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return static::trans('labels.navigation');
+    }
 
     public static function getNavigationGroup(): string | UnitEnum | null
     {
@@ -52,6 +63,14 @@ class TopbarMenuItemResource extends Resource
     public static function getNavigationSort(): ?int
     {
         return static::plugin()?->getResourceNavigationSort() ?? parent::getNavigationSort();
+    }
+
+    /**
+     * Short helper for the package's translation namespace.
+     */
+    protected static function trans(string $key, array $replace = []): string
+    {
+        return __("filament-topbar-menu::filament-topbar-menu.{$key}", $replace);
     }
 
     protected static function plugin(): ?TopbarMenuPlugin
@@ -72,16 +91,17 @@ class TopbarMenuItemResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Link')
+                Section::make(static::trans('sections.link'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('label')
+                            ->label(static::trans('fields.label'))
                             ->required()
                             ->maxLength(255),
 
                         Select::make('parent_id')
-                            ->label('Parent item')
-                            ->placeholder('None (top level)')
+                            ->label(static::trans('fields.parent.label'))
+                            ->placeholder(static::trans('fields.parent.placeholder'))
                             ->options(
                                 fn (?TopbarMenuItem $record): array => TopbarMenuItem::query()
                                     ->root()
@@ -92,36 +112,41 @@ class TopbarMenuItemResource extends Resource
                             )
                             ->searchable()
                             ->nullable()
-                            ->helperText('Items with a parent are shown in the parent\'s dropdown.'),
+                            ->helperText(static::trans('fields.parent.helper')),
 
                         Select::make('type')
-                            ->label('Link type')
+                            ->label(static::trans('fields.type.label'))
                             ->options([
-                                TopbarMenuItem::TYPE_URL => 'URL',
-                                TopbarMenuItem::TYPE_ROUTE => 'Laravel route',
+                                TopbarMenuItem::TYPE_URL => static::trans('fields.type.options.url'),
+                                TopbarMenuItem::TYPE_ROUTE => static::trans('fields.type.options.route'),
                             ])
                             ->default(TopbarMenuItem::TYPE_URL)
                             ->required()
                             ->live(),
 
                         Select::make('target')
+                            ->label(static::trans('fields.target.label'))
                             ->options([
-                                TopbarMenuItem::TARGET_SELF => 'Same tab',
-                                TopbarMenuItem::TARGET_BLANK => 'New tab',
+                                TopbarMenuItem::TARGET_SELF => static::trans('fields.target.options.self'),
+                                TopbarMenuItem::TARGET_BLANK => static::trans('fields.target.options.blank'),
                             ])
-                            ->default(TopbarMenuItem::TARGET_SELF)
+                            // The config only seeds the default for new items; the
+                            // stored per-item choice is always honored at render.
+                            ->default(fn (): string => config('filament-topbar-menu.open_external_links_in_new_tab', true)
+                                ? TopbarMenuItem::TARGET_BLANK
+                                : TopbarMenuItem::TARGET_SELF)
                             ->required(),
 
                         TextInput::make('url')
-                            ->label('URL')
-                            ->placeholder('https://example.com')
+                            ->label(static::trans('fields.url.label'))
+                            ->placeholder(static::trans('fields.url.placeholder'))
                             ->url()
                             ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
                             ->required(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
                             ->columnSpanFull(),
 
                         Select::make('route')
-                            ->label('Route name')
+                            ->label(static::trans('fields.route.label'))
                             ->options(
                                 fn (): array => collect(Route::getRoutes()->getRoutesByName())
                                     ->keys()
@@ -135,34 +160,35 @@ class TopbarMenuItemResource extends Resource
                             ->required(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_ROUTE),
 
                         KeyValue::make('route_parameters')
-                            ->keyLabel('Parameter')
-                            ->valueLabel('Value')
+                            ->keyLabel(static::trans('fields.route_parameters.key'))
+                            ->valueLabel(static::trans('fields.route_parameters.value'))
                             ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_ROUTE)
                             ->nullable(),
                     ]),
 
-                Section::make('Appearance & behavior')
+                Section::make(static::trans('sections.appearance'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('icon')
-                            ->placeholder('heroicon-o-link')
-                            ->helperText('Any icon name supported by Filament, e.g. a Heroicon.'),
+                            ->label(static::trans('fields.icon.label'))
+                            ->placeholder(static::trans('fields.icon.placeholder'))
+                            ->helperText(static::trans('fields.icon.helper')),
 
                         TextInput::make('favicon_url')
-                            ->label('Favicon URL')
+                            ->label(static::trans('fields.favicon_url.label'))
                             ->url()
                             ->suffixAction(
                                 Action::make('fetchFavicon')
-                                    ->label('Fetch favicon')
+                                    ->label(static::trans('actions.fetch_favicon'))
                                     ->icon('heroicon-m-arrow-path')
-                                    ->tooltip('Resolve the favicon from the URL above')
+                                    ->tooltip(static::trans('actions.fetch_favicon_tooltip'))
                                     ->visible(fn (): bool => (bool) config('filament-topbar-menu.enable_favicons', true))
                                     ->action(function (Get $get, Set $set): void {
                                         $url = $get('url');
 
                                         if (blank($url)) {
                                             Notification::make()
-                                                ->title('Enter an external URL first')
+                                                ->title(static::trans('notifications.enter_url_first'))
                                                 ->warning()
                                                 ->send();
 
@@ -173,7 +199,7 @@ class TopbarMenuItemResource extends Resource
 
                                         if ($favicon === null) {
                                             Notification::make()
-                                                ->title('No favicon found')
+                                                ->title(static::trans('notifications.favicon_not_found'))
                                                 ->warning()
                                                 ->send();
 
@@ -183,31 +209,32 @@ class TopbarMenuItemResource extends Resource
                                         $set('favicon_url', $favicon);
 
                                         Notification::make()
-                                            ->title('Favicon resolved')
+                                            ->title(static::trans('notifications.favicon_resolved'))
                                             ->success()
                                             ->send();
                                     }),
                             ),
 
                         Select::make('visibility')
-                            ->label('Visible to')
-                            ->placeholder('Everyone')
+                            ->label(static::trans('fields.visibility.label'))
+                            ->placeholder(static::trans('fields.visibility.placeholder'))
                             ->options([
-                                'auth' => 'Authenticated users only',
-                                'guest' => 'Guests only',
+                                'auth' => static::trans('fields.visibility.options.auth'),
+                                'guest' => static::trans('fields.visibility.options.guest'),
                             ])
                             ->nullable()
-                            ->helperText('Role-based visibility (the "roles" key) is preserved when set directly on the record.')
+                            ->helperText(static::trans('fields.visibility.helper'))
                             ->formatStateUsing(fn ($state): ?string => TopbarMenuItem::visibilityModeFromArray(is_array($state) ? $state : null))
                             ->dehydrateStateUsing(fn ($state, ?TopbarMenuItem $record): ?array => TopbarMenuItem::applyVisibilityMode($record?->visibility, $state)),
 
                         TextInput::make('sort')
+                            ->label(static::trans('fields.sort.label'))
                             ->numeric()
                             ->default(0)
-                            ->helperText('Lower values are shown first. You can also drag rows in the list.'),
+                            ->helperText(static::trans('fields.sort.helper')),
 
                         Toggle::make('is_active')
-                            ->label('Active')
+                            ->label(static::trans('fields.is_active.label'))
                             ->default(true)
                             ->inline(false),
                     ]),
@@ -224,28 +251,34 @@ class TopbarMenuItemResource extends Resource
                     ->grow(false),
 
                 TextColumn::make('label')
+                    ->label(static::trans('fields.label'))
                     ->searchable()
                     ->sortable()
                     ->description(fn (TopbarMenuItem $record): ?string => $record->resolveUrl()),
 
                 TextColumn::make('parent.label')
-                    ->label('Parent')
+                    ->label(static::trans('columns.parent'))
                     ->placeholder('—')
                     ->sortable(),
 
                 TextColumn::make('type')
+                    ->label(static::trans('columns.type'))
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => static::trans("fields.type.options.{$state}"))
                     ->color(fn (string $state): string => $state === TopbarMenuItem::TYPE_ROUTE ? 'info' : 'gray'),
 
                 TextColumn::make('target')
+                    ->label(static::trans('columns.target'))
                     ->badge()
                     ->color('gray')
+                    ->formatStateUsing(fn (string $state): string => static::trans('fields.target.options.' . ($state === TopbarMenuItem::TARGET_BLANK ? 'blank' : 'self')))
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 ToggleColumn::make('is_active')
-                    ->label('Active'),
+                    ->label(static::trans('columns.is_active')),
 
                 TextColumn::make('sort')
+                    ->label(static::trans('columns.sort'))
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -257,17 +290,18 @@ class TopbarMenuItemResource extends Resource
             ->afterReordering(fn () => app(TopbarMenu::class)->flushCache())
             ->filters([
                 SelectFilter::make('type')
+                    ->label(static::trans('filters.type'))
                     ->options([
-                        TopbarMenuItem::TYPE_URL => 'URL',
-                        TopbarMenuItem::TYPE_ROUTE => 'Laravel route',
+                        TopbarMenuItem::TYPE_URL => static::trans('fields.type.options.url'),
+                        TopbarMenuItem::TYPE_ROUTE => static::trans('fields.type.options.route'),
                     ]),
 
                 TernaryFilter::make('is_active')
-                    ->label('Active'),
+                    ->label(static::trans('filters.is_active')),
             ])
             ->recordActions([
                 Action::make('refreshFavicon')
-                    ->label('Fetch favicon')
+                    ->label(static::trans('actions.fetch_favicon'))
                     ->icon('heroicon-m-arrow-path')
                     ->visible(
                         fn (TopbarMenuItem $record): bool => config('filament-topbar-menu.enable_favicons', true)
@@ -279,7 +313,7 @@ class TopbarMenuItemResource extends Resource
 
                         if ($favicon === null) {
                             Notification::make()
-                                ->title('No favicon found')
+                                ->title(static::trans('notifications.favicon_not_found'))
                                 ->warning()
                                 ->send();
 
@@ -289,7 +323,7 @@ class TopbarMenuItemResource extends Resource
                         $record->forceFill(['favicon_url' => $favicon])->save();
 
                         Notification::make()
-                            ->title('Favicon updated')
+                            ->title(static::trans('notifications.favicon_updated'))
                             ->success()
                             ->send();
                     }),
@@ -300,7 +334,7 @@ class TopbarMenuItemResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     BulkAction::make('refreshFavicons')
-                        ->label('Fetch favicons')
+                        ->label(static::trans('actions.fetch_favicons'))
                         ->icon('heroicon-m-arrow-path')
                         ->visible(fn (): bool => (bool) config('filament-topbar-menu.enable_favicons', true))
                         ->action(function (Collection $records): void {
@@ -319,7 +353,7 @@ class TopbarMenuItemResource extends Resource
                             }
 
                             Notification::make()
-                                ->title("Resolved {$resolved} favicon(s)")
+                                ->title(static::trans('notifications.favicons_resolved', ['count' => $resolved]))
                                 ->success()
                                 ->send();
                         })

@@ -50,8 +50,10 @@ return [
     | External links
     |--------------------------------------------------------------------------
     |
-    | When enabled, links pointing to a different host than the application
-    | are opened in a new tab, even when their target is set to `_self`.
+    | The default value of the "Target" field when creating a new menu item:
+    | when enabled, new items default to opening in a new tab. This is only a
+    | default — the per-item choice ("Same tab" / "New tab") is always honored
+    | at render time and is never overridden.
     |
     */
 
