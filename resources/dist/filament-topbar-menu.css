@@ -1,0 +1,192 @@
+/*
+ * No overflow on the nav: an overflow value on either axis forces the other
+ * axis to compute to `auto` as well (CSS Overflow §3.1), turning the nav into
+ * a scroll container that clips the absolutely-positioned dropdown. Items are
+ * allowed to shrink instead so the row stays on one line.
+ */
+.ftm-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-inline-start: 1.25rem;
+    min-width: 0;
+}
+
+.ftm-item {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.ftm-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.ftm-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    color: rgb(75 85 99);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ftm-link:hover,
+.ftm-link:focus-visible {
+    background-color: rgb(0 0 0 / 0.05);
+    color: rgb(17 24 39);
+}
+
+.dark .ftm-link {
+    color: rgb(156 163 175);
+}
+
+.dark .ftm-link:hover,
+.dark .ftm-link:focus-visible {
+    background-color: rgb(255 255 255 / 0.05);
+    color: rgb(255 255 255);
+}
+
+.ftm-caret {
+    padding: 0.375rem 0.25rem;
+    margin-inline-start: -0.25rem;
+}
+
+.ftm-icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.ftm-favicon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    border-radius: 0.1875rem;
+    object-fit: contain;
+}
+
+.ftm-chevron {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.ftm-dropdown {
+    position: absolute;
+    top: 100%;
+    inset-inline-start: 0;
+    z-index: 40;
+    min-width: 11rem;
+    max-width: 18rem;
+    margin-top: 0.375rem;
+    padding: 0.25rem;
+    border-radius: 0.75rem;
+    background-color: rgb(255 255 255);
+    box-shadow:
+        0 0 0 1px rgb(0 0 0 / 0.05),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark .ftm-dropdown {
+    background-color: rgb(24 24 27);
+    box-shadow:
+        0 0 0 1px rgb(255 255 255 / 0.1),
+        0 10px 15px -3px rgb(0 0 0 / 0.4),
+        0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/*
+ * Transparent bridge across the margin-top gap. Without it the pointer passes
+ * over neither the trigger nor the dropdown while moving between them, firing
+ * mouseleave on .ftm-item and closing the menu before it can be reached. The
+ * bridge is part of the dropdown (a descendant of .ftm-item), so hovering it
+ * keeps .ftm-item hovered.
+ */
+.ftm-dropdown::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: -0.375rem;
+    height: 0.375rem;
+}
+
+.ftm-dropdown[x-cloak] {
+    display: none !important;
+}
+
+.ftm-dropdown-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: rgb(75 85 99);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ftm-dropdown-link:hover,
+.ftm-dropdown-link:focus-visible {
+    background-color: rgb(0 0 0 / 0.05);
+    color: rgb(17 24 39);
+}
+
+.dark .ftm-dropdown-link {
+    color: rgb(156 163 175);
+}
+
+.dark .ftm-dropdown-link:hover,
+.dark .ftm-dropdown-link:focus-visible {
+    background-color: rgb(255 255 255 / 0.05);
+    color: rgb(255 255 255);
+}
+
+.ftm-dropdown-link .ftm-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ftm-transition-enter {
+    transition: opacity 0.15s ease;
+    animation: ftm-fade-in 0.15s ease;
+}
+
+@keyframes ftm-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/*
+ * With the default TOPBAR_LOGO_AFTER render hook the menu lives inside
+ * Filament's .fi-topbar-start, which Filament itself hides below the `lg`
+ * (1024px) breakpoint. A max-width:768px block would therefore never apply,
+ * so no mobile-specific rules are shipped here. To surface the menu on
+ * narrow viewports, register it at a different hook (see README).
+ */
+@media (max-width: 1024px) {
+    .ftm-nav {
+        margin-inline-start: 0.75rem;
+    }
+}
