@@ -98,10 +98,6 @@ return [
         'favicons_resolved' => ':count favicon(s) résolu(s)',
     ],
 
-    'menu' => [
-        'toggle_submenu' => 'Afficher/masquer le sous-menu « :label »',
-    ],
-
     'command' => [
         'disabled' => 'La résolution des favicons est désactivée (filament-topbar-menu.enable_favicons) ; rien à faire.',
         'nothing_to_refresh' => "Aucun élément de menu n'a besoin d'une mise à jour de favicon.",

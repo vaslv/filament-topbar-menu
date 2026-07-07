@@ -7,7 +7,7 @@ A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to 
 - 🖼️ **Icons and favicons** — auto-resolve favicons for external links (never at render time)
 - ⚡ **Cached** — no database query on page render; the cache is flushed automatically on changes
 - 🛠️ **Full Filament resource** — create, edit, delete, drag-and-drop reordering, activate/deactivate
-- 🌙 **Filament-native look** — dark mode support, responsive dropdowns
+- 🌙 **Truly Filament-native look** — built from Filament's own topbar/dropdown components, so it's pixel-identical to the panel's `topNavigation()` menu (dark mode, active-item highlight, spacing) with zero custom CSS
 - 🌍 **Translatable** — ships with English, Russian, German, Spanish and French; add your own
 - 🪝 Rendered through the official `PanelsRenderHook::TOPBAR_LOGO_AFTER` render hook — no layout overrides
 
@@ -30,11 +30,8 @@ The package migration is loaded automatically. Run it:
 php artisan migrate
 ```
 
-Then make sure the plugin's CSS is published (Filament does this automatically on `composer update` via its upgrade hook, but you can run it manually):
-
-```bash
-php artisan filament:assets
-```
+The menu is rendered with Filament's own topbar and dropdown components, so it
+inherits your theme automatically — there are no assets to build or publish.
 
 Optionally publish the migration and config instead of using the bundled ones:
 
@@ -134,13 +131,16 @@ If a named route no longer exists, the item is skipped instead of breaking the p
 
 ### Example: a dropdown menu
 
-A top-level item with children opens a dropdown on hover (or on click/tap). The parent itself can still be a regular link:
+A top-level item with children renders as a Filament dropdown group — exactly like
+the panel's native top navigation. The group label is the dropdown toggle; if the
+parent item also has its own URL, that link appears as the first entry inside the
+dropdown (so it stays reachable), matching Filament's grouping convention.
 
 ```php
 $services = TopbarMenuItem::create([
     'label' => 'Services',
     'type' => 'url',
-    'url' => 'https://status.example.com', // optional — omit to make it a pure dropdown toggle
+    'url' => 'https://status.example.com', // optional — becomes the first dropdown entry; omit for a pure toggle
 ]);
 
 TopbarMenuItem::create([

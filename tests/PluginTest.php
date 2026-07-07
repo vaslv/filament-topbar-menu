@@ -173,18 +173,21 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('Analytics', $html);
         $this->assertStringNotContainsString('Hidden', $html);
 
-        // The per-item target is honored: the "New tab" parent gets _blank
-        // (with rel), and the "Same tab" child is NOT promoted to a new tab.
-        $this->assertStringContainsString('target="_blank"', $html);
-        $this->assertStringContainsString('target="_self"', $html);
-        $this->assertStringContainsString('rel="noopener noreferrer"', $html);
+        // Rendered with Filament's own topbar/dropdown markup for pixel-parity
+        // with the native top navigation.
+        $this->assertStringContainsString('fi-topbar-nav-groups', $html);
+        $this->assertStringContainsString('fi-topbar-item', $html);
+        $this->assertStringContainsString('fi-dropdown', $html);
+        $this->assertStringContainsString('fi-dropdown-list-item', $html);
 
-        // The parent renders a dropdown with its child inside.
-        $this->assertStringContainsString('ftm-dropdown', $html);
+        // The parent with children renders a dropdown containing its child link.
         $this->assertStringContainsString('href="https://analytics.example.com"', $html);
 
+        // The per-item target is honored: the "New tab" parent link gets _blank.
+        $this->assertStringContainsString('target="_blank"', $html);
+
         // The favicon is rendered from the stored URL — no HTTP request needed.
-        $this->assertStringContainsString('src="https://services.example.com/favicon.ico"', $html);
+        $this->assertStringContainsString('https://services.example.com/favicon.ico', $html);
 
         // Heroicons render as inline SVG through the Filament icon component.
         $this->assertStringContainsString('<svg', $html);

@@ -1,102 +1,95 @@
 @php
-    /** @var \Illuminate\Database\Eloquent\Collection<int, \Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem> $items */
+    use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
+
+    /** @var \Illuminate\Database\Eloquent\Collection<int, TopbarMenuItem> $items */
     /** @var ?\Illuminate\Contracts\Auth\Authenticatable $user */
+
+    // Validate a free-text icon name before handing it to Filament: an unknown
+    // name would otherwise throw SvgNotFound and 500 every panel page. Favicons
+    // are passed separately as images and never go through this.
+    $ftmSafeIcon = function (?string $icon): ?string {
+        if (blank($icon)) {
+            return null;
+        }
+
+        try {
+            \Filament\Support\generate_icon_html($icon);
+
+            return $icon;
+        } catch (\Throwable) {
+            return null;
+        }
+    };
 @endphp
 
 @if ($items->isNotEmpty())
-    <nav class="ftm-nav" aria-label="Topbar menu">
+    <ul class="fi-topbar-nav-groups">
         @foreach ($items as $item)
             @php
-                $url = $item->resolveUrl();
-                $target = $item->resolveTarget();
                 $children = $item->visibleChildren($user ?? null);
+                $url = $item->resolveUrl();
+                $itemNewTab = $item->resolveTarget() === TopbarMenuItem::TARGET_BLANK;
+                $itemIcon = $item->favicon_url ?: $ftmSafeIcon($item->icon);
             @endphp
 
             @if ($children->isEmpty())
                 @if ($url)
-                    <a
-                        href="{{ $url }}"
-                        target="{{ $target }}"
-                        @if ($target === '_blank') rel="noopener noreferrer" @endif
-                        class="ftm-link"
+                    <x-filament-panels::topbar.item
+                        :url="$url"
+                        :icon="$itemIcon"
+                        :active="$item->isActive()"
+                        :should-open-url-in-new-tab="$itemNewTab"
                     >
-                        @include('filament-topbar-menu::partials.item-icon', ['item' => $item])
-                        <span class="ftm-label">{{ $item->label }}</span>
-                    </a>
+                        {{ $item->label }}
+                    </x-filament-panels::topbar.item>
                 @endif
             @else
-                <div
-                    class="ftm-item"
-                    x-data="{ open: false }"
-                    x-on:mouseenter="if (window.matchMedia('(hover: hover)').matches) open = true"
-                    x-on:mouseleave="if (window.matchMedia('(hover: hover)').matches) open = false"
-                    x-on:keydown.escape.window="open = false"
-                >
-                    <div class="ftm-trigger">
+                <x-filament::dropdown placement="bottom-start" teleport>
+                    <x-slot name="trigger">
+                        <x-filament-panels::topbar.item
+                            :icon="$itemIcon"
+                            :active="$item->isBranchActive($user ?? null)"
+                        >
+                            {{ $item->label }}
+                        </x-filament-panels::topbar.item>
+                    </x-slot>
+
+                    <x-filament::dropdown.list>
+                        {{-- A parent that is itself a link stays reachable as the first entry. --}}
                         @if ($url)
-                            <a
-                                href="{{ $url }}"
-                                target="{{ $target }}"
-                                @if ($target === '_blank') rel="noopener noreferrer" @endif
-                                class="ftm-link"
+                            <x-filament::dropdown.list.item
+                                tag="a"
+                                :href="$url"
+                                :image="$item->favicon_url"
+                                :icon="$item->favicon_url ? null : $ftmSafeIcon($item->icon)"
+                                :target="$itemNewTab ? '_blank' : null"
+                                :color="$item->isActive() ? 'primary' : 'gray'"
                             >
-                                @include('filament-topbar-menu::partials.item-icon', ['item' => $item])
-                                <span class="ftm-label">{{ $item->label }}</span>
-                            </a>
-
-                            <button
-                                type="button"
-                                class="ftm-link ftm-caret"
-                                x-on:click="open = ! open"
-                                aria-haspopup="true"
-                                x-bind:aria-expanded="open"
-                            >
-                                <span class="fi-sr-only">{{ __('filament-topbar-menu::filament-topbar-menu.menu.toggle_submenu', ['label' => $item->label]) }}</span>
-                                @include('filament-topbar-menu::partials.chevron')
-                            </button>
-                        @else
-                            <button
-                                type="button"
-                                class="ftm-link"
-                                x-on:click="open = ! open"
-                                aria-haspopup="true"
-                                x-bind:aria-expanded="open"
-                            >
-                                @include('filament-topbar-menu::partials.item-icon', ['item' => $item])
-                                <span class="ftm-label">{{ $item->label }}</span>
-                                @include('filament-topbar-menu::partials.chevron')
-                            </button>
+                                {{ $item->label }}
+                            </x-filament::dropdown.list.item>
                         @endif
-                    </div>
 
-                    <div
-                        class="ftm-dropdown"
-                        x-cloak
-                        x-show="open"
-                        x-transition:enter="ftm-transition-enter"
-                        x-on:click.outside="open = false"
-                    >
                         @foreach ($children as $child)
                             @php
                                 $childUrl = $child->resolveUrl();
-                                $childTarget = $child->resolveTarget();
                             @endphp
 
                             @if ($childUrl)
-                                <a
-                                    href="{{ $childUrl }}"
-                                    target="{{ $childTarget }}"
-                                    @if ($childTarget === '_blank') rel="noopener noreferrer" @endif
-                                    class="ftm-dropdown-link"
+                                <x-filament::dropdown.list.item
+                                    tag="a"
+                                    :href="$childUrl"
+                                    :image="$child->favicon_url"
+                                    :icon="$child->favicon_url ? null : $ftmSafeIcon($child->icon)"
+                                    :target="$child->resolveTarget() === TopbarMenuItem::TARGET_BLANK ? '_blank' : null"
+                                    :color="$child->isActive() ? 'primary' : 'gray'"
                                 >
-                                    @include('filament-topbar-menu::partials.item-icon', ['item' => $child])
-                                    <span class="ftm-label">{{ $child->label }}</span>
-                                </a>
+                                    {{ $child->label }}
+                                </x-filament::dropdown.list.item>
                             @endif
                         @endforeach
-                    </div>
-                </div>
+                    </x-filament::dropdown.list>
+                </x-filament::dropdown>
             @endif
         @endforeach
-    </nav>
+    </ul>
 @endif

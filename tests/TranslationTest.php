@@ -2,9 +2,6 @@
 
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
-use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
-use Vaslv\FilamentTopbarMenu\TopbarMenu;
-
 class TranslationTest extends TestCase
 {
     public function test_the_package_translations_are_registered(): void
@@ -50,30 +47,5 @@ class TranslationTest extends TestCase
                 "Locale [{$locale}] does not define the same translation keys as [en].",
             );
         }
-    }
-
-    public function test_the_submenu_aria_label_is_translated(): void
-    {
-        $parent = TopbarMenuItem::create([
-            'label' => 'Сервисы',
-            'type' => TopbarMenuItem::TYPE_URL,
-            'url' => 'https://example.com',
-        ]);
-
-        TopbarMenuItem::create([
-            'label' => 'Child',
-            'type' => TopbarMenuItem::TYPE_URL,
-            'url' => 'https://example.com/child',
-            'parent_id' => $parent->id,
-        ]);
-
-        $this->app->setLocale('ru');
-
-        $html = view('filament-topbar-menu::menu', [
-            'items' => app(TopbarMenu::class)->visibleItems(),
-            'user' => null,
-        ])->render();
-
-        $this->assertStringContainsString('Открыть подменю «Сервисы»', $html);
     }
 }

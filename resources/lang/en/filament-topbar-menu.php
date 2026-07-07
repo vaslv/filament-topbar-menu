@@ -98,10 +98,6 @@ return [
         'favicons_resolved' => ':count favicon(s) resolved',
     ],
 
-    'menu' => [
-        'toggle_submenu' => 'Toggle :label submenu',
-    ],
-
     'command' => [
         'disabled' => 'Favicon resolution is disabled (filament-topbar-menu.enable_favicons); nothing to do.',
         'nothing_to_refresh' => 'No menu items need a favicon refresh.',

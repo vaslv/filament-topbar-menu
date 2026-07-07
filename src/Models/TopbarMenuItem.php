@@ -180,6 +180,43 @@ class TopbarMenuItem extends Model
     }
 
     /**
+     * Whether this item points at the page currently being viewed, so the menu
+     * can highlight it the same way Filament highlights its own active items.
+     * Route items match by route name; URL items match by normalized path.
+     */
+    public function isActive(): bool
+    {
+        if ($this->type === self::TYPE_ROUTE) {
+            return filled($this->route)
+                && Route::has($this->route)
+                && request()->routeIs($this->route);
+        }
+
+        $url = $this->resolveUrl();
+
+        if ($url === null) {
+            return false;
+        }
+
+        $itemPath = rtrim((string) strtok($url, '?'), '/');
+
+        return $itemPath !== '' && $itemPath === rtrim(request()->url(), '/');
+    }
+
+    /**
+     * Whether this item or any of its visible children is active — used to mark
+     * a dropdown group active when one of its links is the current page.
+     */
+    public function isBranchActive(?Authenticatable $user = null): bool
+    {
+        if ($this->isActive()) {
+            return true;
+        }
+
+        return $this->visibleChildren($user)->contains(fn (self $child): bool => $child->isActive());
+    }
+
+    /**
      * The `visibility` JSON column supports the following keys:
      *
      * - `auth`  (bool)  — only show to authenticated users

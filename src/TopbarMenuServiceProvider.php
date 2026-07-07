@@ -2,8 +2,6 @@
 
 namespace Vaslv\FilamentTopbarMenu;
 
-use Filament\Support\Assets\Css;
-use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\ServiceProvider;
 use Vaslv\FilamentTopbarMenu\Commands\RefreshFaviconsCommand;
 use Vaslv\FilamentTopbarMenu\Support\FaviconResolver;
@@ -23,10 +21,6 @@ class TopbarMenuServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'filament-topbar-menu');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'filament-topbar-menu');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-
-        FilamentAsset::register([
-            Css::make('filament-topbar-menu', __DIR__.'/../resources/dist/filament-topbar-menu.css'),
-        ], package: 'vaslv/filament-topbar-menu');
 
         if ($this->app->runningInConsole()) {
             $this->commands([

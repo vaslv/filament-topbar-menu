@@ -5,6 +5,31 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0]
+
+### Changed
+
+- **The menu is now rendered with Filament's own topbar and dropdown components**
+  (`fi-topbar-nav-groups`, `x-filament-panels::topbar.item`, `x-filament::dropdown`,
+  `x-filament::dropdown.list.item`) instead of custom markup and CSS. It is now
+  pixel-identical to Filament's native `topNavigation()` menu: same spacing, dark
+  mode, dropdown behavior, and it highlights the active item / active group.
+- A parent item that has both a URL and children now renders as a dropdown group
+  whose first entry is the parent's own link (matching Filament's grouping), rather
+  than a link with a separate caret.
+
+### Added
+
+- Active-state highlighting: the item (or dropdown group) pointing at the current
+  page is marked active, via new `TopbarMenuItem::isActive()` / `isBranchActive()`.
+
+### Removed
+
+- The bundled CSS asset and its `FilamentAsset` registration — there is no longer
+  any custom CSS, so `php artisan filament:assets` is not needed for this plugin.
+  The `resources/dist/filament-topbar-menu.css` file and the icon/chevron partials
+  were removed.
+
 ## [1.1.1]
 
 ### Fixed

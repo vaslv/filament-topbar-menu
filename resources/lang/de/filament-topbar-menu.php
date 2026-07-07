@@ -98,10 +98,6 @@ return [
         'favicons_resolved' => ':count Favicon(s) ermittelt',
     ],
 
-    'menu' => [
-        'toggle_submenu' => 'Untermenü „:label“ umschalten',
-    ],
-
     'command' => [
         'disabled' => 'Die Favicon-Auflösung ist deaktiviert (filament-topbar-menu.enable_favicons); nichts zu tun.',
         'nothing_to_refresh' => 'Keine Menüeinträge benötigen eine Favicon-Aktualisierung.',

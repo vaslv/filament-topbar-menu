@@ -98,10 +98,6 @@ return [
         'favicons_resolved' => 'Определено фавиконов: :count',
     ],
 
-    'menu' => [
-        'toggle_submenu' => 'Открыть подменю «:label»',
-    ],
-
     'command' => [
         'disabled' => 'Загрузка фавиконов отключена (filament-topbar-menu.enable_favicons); делать нечего.',
         'nothing_to_refresh' => 'Нет пунктов меню, требующих обновления фавикона.',

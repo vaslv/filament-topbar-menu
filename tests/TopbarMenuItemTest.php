@@ -3,6 +3,7 @@
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
 use Illuminate\Auth\GenericUser;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
@@ -143,5 +144,35 @@ class TopbarMenuItemTest extends TestCase
 
         // Nothing set at all -> null (column stays empty).
         $this->assertNull(TopbarMenuItem::applyVisibilityMode(null, null));
+    }
+
+    public function test_is_active_matches_the_current_url(): void
+    {
+        $this->app->instance('request', Request::create('https://myapp.test/dashboard'));
+
+        $active = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard']);
+        $trailingSlash = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard/']);
+        $withQuery = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard?tab=1']);
+        $other = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/other']);
+
+        $this->assertTrue($active->isActive());
+        $this->assertTrue($trailingSlash->isActive());
+        $this->assertTrue($withQuery->isActive());
+        $this->assertFalse($other->isActive());
+    }
+
+    public function test_a_group_is_active_when_one_of_its_children_is_active(): void
+    {
+        $this->app->instance('request', Request::create('https://myapp.test/reports'));
+
+        $parent = TopbarMenuItem::create(['label' => 'Group', 'type' => 'url', 'url' => 'https://myapp.test/overview']);
+        TopbarMenuItem::create(['label' => 'Reports', 'type' => 'url', 'url' => 'https://myapp.test/reports', 'parent_id' => $parent->id]);
+
+        $lonelyParent = TopbarMenuItem::create(['label' => 'Other', 'type' => 'url', 'url' => 'https://myapp.test/other']);
+        TopbarMenuItem::create(['label' => 'Child', 'type' => 'url', 'url' => 'https://myapp.test/child', 'parent_id' => $lonelyParent->id]);
+
+        $this->assertFalse($parent->isActive());
+        $this->assertTrue($parent->isBranchActive());
+        $this->assertFalse($lonelyParent->isBranchActive());
     }
 }
