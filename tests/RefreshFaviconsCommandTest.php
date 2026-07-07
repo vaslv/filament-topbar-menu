@@ -57,6 +57,24 @@ class RefreshFaviconsCommandTest extends TestCase
         $this->assertSame('https://other.com/favicon.ico', $existing->refresh()->favicon_url);
     }
 
+    public function test_it_does_not_break_on_labels_containing_console_style_tags(): void
+    {
+        Http::fake([
+            '*/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+        ]);
+
+        // A stored label containing Symfony console markup must not abort the
+        // command: the output is escaped, so `<fg=bogus>` (an invalid style tag
+        // that would otherwise throw) is printed literally.
+        TopbarMenuItem::create([
+            'label' => 'Deploy <fg=bogus>prod</>',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+        ]);
+
+        $this->artisan('filament-topbar-menu:refresh-favicons')->assertSuccessful();
+    }
+
     public function test_it_is_a_noop_success_when_favicons_are_disabled(): void
     {
         config()->set('filament-topbar-menu.enable_favicons', false);

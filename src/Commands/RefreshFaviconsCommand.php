@@ -55,8 +55,14 @@ class RefreshFaviconsCommand extends Command
         foreach ($items as $item) {
             $favicon = $resolver->resolve($item->url);
 
+            // Escape the admin-controlled label (and the favicon) before they
+            // reach the console: a stored value containing `<`/`>` would
+            // otherwise be parsed as Symfony style tags and could throw mid-run.
+            // Same reason the not-found string above is escaped.
+            $label = OutputFormatter::escape($item->label);
+
             if ($favicon === null) {
-                $this->components->twoColumnDetail($item->label, "<fg=yellow>{$notFound}</>");
+                $this->components->twoColumnDetail($label, "<fg=yellow>{$notFound}</>");
 
                 continue;
             }
@@ -64,7 +70,7 @@ class RefreshFaviconsCommand extends Command
             $item->forceFill(['favicon_url' => $favicon])->save();
             $resolved++;
 
-            $this->components->twoColumnDetail($item->label, $favicon);
+            $this->components->twoColumnDetail($label, OutputFormatter::escape($favicon));
         }
 
         $this->components->info(__('filament-topbar-menu::filament-topbar-menu.command.resolved_summary', [

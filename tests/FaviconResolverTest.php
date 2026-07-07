@@ -131,4 +131,69 @@ class FaviconResolverTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_it_refuses_to_fetch_private_loopback_and_link_local_hosts(): void
+    {
+        Http::fake();
+
+        $resolver = app(FaviconResolver::class);
+
+        // SSRF guard: loopback (by IP and by name), the cloud metadata endpoint,
+        // an RFC1918 address and IPv6 loopback are never requested.
+        $this->assertNull($resolver->resolve('http://127.0.0.1/'));
+        $this->assertNull($resolver->resolve('http://localhost/'));
+        $this->assertNull($resolver->resolve('http://169.254.169.254/latest/meta-data/'));
+        $this->assertNull($resolver->resolve('http://10.0.0.1/'));
+        $this->assertNull($resolver->resolve('http://[::1]/'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_redirect_to_an_internal_address_is_not_followed(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('', 302, [
+                'Location' => 'http://169.254.169.254/latest/meta-data/',
+            ]),
+            '*' => Http::response('', 200),
+        ]);
+
+        // A public host 302s toward cloud metadata; the resolver re-checks the
+        // hop and refuses it instead of blindly following the redirect.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '169.254.169.254'));
+    }
+
+    public function test_data_uri_favicons_from_link_tags_are_not_stored(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com' => Http::response(
+                '<html><head><link rel="icon" href="data:image/png;base64,AAAA"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // data: URIs are unbounded and would land in the panel's CSS url() sink,
+        // so they are rejected rather than persisted.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com'));
+    }
+
+    public function test_favicon_hrefs_that_decode_to_quotes_are_not_stored(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com' => Http::response(
+                // Decodes to /ic'on.png — a single quote would break out of
+                // style="background-image: url('…')" in the dropdown markup.
+                '<html><head><link rel="icon" href="/ic&#39;on.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com'));
+    }
 }

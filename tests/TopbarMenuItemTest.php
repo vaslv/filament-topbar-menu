@@ -2,7 +2,9 @@
 
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
+use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Auth\GenericUser;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
@@ -174,5 +176,47 @@ class TopbarMenuItemTest extends TestCase
         $this->assertFalse($parent->isActive());
         $this->assertTrue($parent->isBranchActive());
         $this->assertFalse($lonelyParent->isBranchActive());
+    }
+
+    public function test_role_visibility_fails_closed_when_it_cannot_be_evaluated(): void
+    {
+        $rolesOnly = new TopbarMenuItem(['visibility' => ['roles' => ['admin']]]);
+
+        // A guest can never satisfy a role restriction.
+        $this->assertFalse($rolesOnly->isVisibleTo(null));
+
+        // A user model without hasAnyRole() must hide the item, not leak it to
+        // everyone — the restriction cannot be evaluated, so fail closed.
+        $this->assertFalse($rolesOnly->isVisibleTo(new GenericUser(['id' => 1])));
+    }
+
+    public function test_role_visibility_uses_has_any_role_when_the_user_supports_it(): void
+    {
+        $rolesOnly = new TopbarMenuItem(['visibility' => ['roles' => ['admin']]]);
+
+        $admin = new class implements Authenticatable
+        {
+            use AuthenticatableTrait;
+
+            /** @param  array<int, string>  $roles */
+            public function hasAnyRole(array $roles): bool
+            {
+                return in_array('admin', $roles, true);
+            }
+        };
+
+        $editor = new class implements Authenticatable
+        {
+            use AuthenticatableTrait;
+
+            /** @param  array<int, string>  $roles */
+            public function hasAnyRole(array $roles): bool
+            {
+                return false;
+            }
+        };
+
+        $this->assertTrue($rolesOnly->isVisibleTo($admin));
+        $this->assertFalse($rolesOnly->isVisibleTo($editor));
     }
 }

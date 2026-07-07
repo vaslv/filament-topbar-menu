@@ -5,6 +5,38 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+### Security
+
+- **The favicon resolver now treats external sites as untrusted.** It refuses to
+  fetch private, loopback and link-local addresses (SSRF) — including the cloud
+  metadata endpoint `169.254.169.254` — and re-validates every redirect hop, so a
+  public site can no longer redirect the resolver onto an internal address. It
+  also caps how much of a response body it reads into memory.
+- **Resolved favicon URLs are validated before they are stored.** Only plain
+  `http(s)` URLs within the storage column limit, with no characters that could
+  break out of the panel's CSS `url('…')` context, are persisted — closing a
+  stored CSS-injection vector through a dropdown item's favicon.
+- **Menu item labels are escaped in the `refresh-favicons` command output**, so a
+  stored label containing `<` or `>` can no longer be misparsed as a Symfony
+  console style tag (completing the hardening started in 1.1.1, which covered only
+  the translated "not found" label).
+
+### Changed
+
+- **`roles` visibility now fails closed.** A menu item restricted by `roles` is
+  hidden when the restriction cannot be evaluated — a guest, or a user model
+  without a `hasAnyRole()` method — instead of being shown to everyone.
+
+  **Upgrade note:** if you set `roles` on items but your user model has no
+  `hasAnyRole()` (e.g. spatie/laravel-permission is not installed), those items
+  will now be hidden. Add the method (or the package) to keep them visible.
+- **`data:` URI favicons are no longer stored**, and favicon resolution now
+  follows at most 3 redirects — previously `data:` values were kept and redirects
+  were followed automatically. Re-run `php artisan filament-topbar-menu:refresh-favicons`
+  to re-resolve any item whose favicon was a `data:` URI.
+
 ## [1.2.1]
 
 ### Fixed

@@ -244,13 +244,15 @@ class TopbarMenuItem extends Model
         $roles = $visibility['roles'] ?? [];
 
         if (filled($roles)) {
-            if ($user === null) {
+            // Fail closed: a role restriction we cannot evaluate — no user, or a
+            // user model without hasAnyRole() (e.g. spatie/laravel-permission not
+            // installed) — hides the item rather than silently showing a
+            // role-restricted link to everyone.
+            if ($user === null || ! method_exists($user, 'hasAnyRole')) {
                 return false;
             }
 
-            if (method_exists($user, 'hasAnyRole')) {
-                return $user->hasAnyRole($roles);
-            }
+            return $user->hasAnyRole($roles);
         }
 
         return true;
