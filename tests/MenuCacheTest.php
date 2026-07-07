@@ -139,6 +139,95 @@ class MenuCacheTest extends TestCase
         $this->assertSame(['Real'], $visible->pluck('label')->all());
     }
 
+    public function test_the_cache_stores_a_serialization_safe_array_not_models(): void
+    {
+        $parent = TopbarMenuItem::create(['label' => 'Parent', 'type' => 'url', 'url' => '/']);
+        TopbarMenuItem::create(['label' => 'Child', 'type' => 'url', 'url' => '/c', 'parent_id' => $parent->id]);
+
+        TopbarMenu::items();
+
+        // The tree is cached as plain arrays — never live models — so a serializing
+        // store cannot hand back __PHP_Incomplete_Class objects.
+        $cached = Cache::get(TopbarMenu::cacheKey());
+
+        $this->assertIsArray($cached);
+        $this->assertSame('Parent', $cached[0]['attributes']['label']);
+        $this->assertSame('Child', $cached[0]['children'][0]['attributes']['label']);
+    }
+
+    public function test_cached_items_rehydrate_into_working_models_with_children(): void
+    {
+        $parent = TopbarMenuItem::create(['label' => 'Services', 'type' => 'url', 'url' => 'https://s.example.com']);
+        TopbarMenuItem::create(['label' => 'Analytics', 'type' => 'url', 'url' => 'https://a.example.com', 'parent_id' => $parent->id]);
+
+        // Prime the cache, then read again so the tree comes back from the cached
+        // array and is rebuilt into models — no query, full model behavior.
+        TopbarMenu::items();
+
+        DB::enableQueryLog();
+        $items = TopbarMenu::items();
+        DB::disableQueryLog();
+
+        $this->assertCount(0, DB::getQueryLog());
+
+        $root = $items->first();
+        $this->assertInstanceOf(TopbarMenuItem::class, $root);
+        $this->assertSame('https://s.example.com', $root->resolveUrl());
+
+        $child = $root->activeChildren->first();
+        $this->assertInstanceOf(TopbarMenuItem::class, $child);
+        $this->assertSame('Analytics', $child->label);
+        $this->assertSame('https://a.example.com', $child->resolveUrl());
+    }
+
+    public function test_a_stale_model_collection_cache_is_replaced_with_an_array(): void
+    {
+        TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);
+
+        // Simulate a cache written by an older release that stored live models.
+        Cache::put(TopbarMenu::cacheKey(), TopbarMenuItem::query()->root()->get(), 3600);
+
+        $items = TopbarMenu::items();
+
+        $this->assertSame(['Real'], $items->pluck('label')->all());
+        $this->assertIsArray(Cache::get(TopbarMenu::cacheKey()));
+    }
+
+    public function test_a_shaped_but_poisoned_cache_entry_does_not_fatal_the_render_path(): void
+    {
+        TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);
+
+        // Top-level shape is valid but a child is not an array — this must be
+        // rejected before it reaches hydrate's typed closure, then rebuilt from
+        // the database, so the render path (visibleItems) never fatals.
+        Cache::put(TopbarMenu::cacheKey(), [
+            ['attributes' => ['id' => 1, 'label' => 'Poison', 'type' => 'url', 'url' => '/x'], 'children' => ['not-an-array']],
+        ], 3600);
+
+        $visible = TopbarMenu::visibleItems(null);
+
+        $this->assertSame(['Real'], $visible->pluck('label')->all());
+    }
+
+    public function test_a_cache_hit_does_not_fire_the_retrieved_event(): void
+    {
+        TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);
+
+        // Prime the cache (the miss reads from the DB), then listen for retrieved.
+        TopbarMenu::items();
+
+        $retrieved = 0;
+        TopbarMenuItem::retrieved(function () use (&$retrieved): void {
+            $retrieved++;
+        });
+
+        // A cache hit rehydrates from the cached array and must not fire the
+        // model's retrieved event — nothing was retrieved from the database.
+        TopbarMenu::items();
+
+        $this->assertSame(0, $retrieved);
+    }
+
     public function test_visible_items_respect_visibility_rules(): void
     {
         TopbarMenuItem::create(['label' => 'Public', 'type' => 'url', 'url' => '/']);

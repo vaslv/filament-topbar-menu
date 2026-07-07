@@ -5,6 +5,19 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0]
+
+### Changed
+
+- **The menu tree is now cached as plain arrays and rehydrated into models on
+  read, instead of caching live Eloquent models.** Caching models is fragile: a
+  serializing store (Redis, file, database) could hand them back as
+  `__PHP_Incomplete_Class` after a deploy or under a shared store — which 1.3.1
+  made non-fatal (a self-healing rebuild). Caching only scalars removes that
+  failure mode at the root: the cached payload can always be reconstructed. No
+  API change — `items()` / `visibleItems()` still return
+  `Collection<int, TopbarMenuItem>`.
+
 ## [1.3.1]
 
 ### Fixed
