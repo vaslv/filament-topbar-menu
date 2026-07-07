@@ -55,20 +55,6 @@
                     </x-slot>
 
                     <x-filament::dropdown.list>
-                        {{-- A parent that is itself a link stays reachable as the first entry. --}}
-                        @if ($url)
-                            <x-filament::dropdown.list.item
-                                tag="a"
-                                :href="$url"
-                                :image="$item->favicon_url"
-                                :icon="$item->favicon_url ? null : $ftmSafeIcon($item->icon)"
-                                :target="$itemNewTab ? '_blank' : null"
-                                :color="$item->isActive() ? 'primary' : 'gray'"
-                            >
-                                {{ $item->label }}
-                            </x-filament::dropdown.list.item>
-                        @endif
-
                         @foreach ($children as $child)
                             @php
                                 $childUrl = $child->resolveUrl();

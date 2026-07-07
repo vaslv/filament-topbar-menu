@@ -5,6 +5,15 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1]
+
+### Fixed
+
+- A dropdown group no longer duplicates its parent's own link as an extra first
+  row inside the dropdown. A parent with children is now a pure toggle (matching
+  Filament's native groups); its own `url`/`route` is ignored. To keep a landing
+  page reachable, add it as an explicit child item.
+
 ## [1.2.0]
 
 ### Changed

@@ -132,15 +132,15 @@ If a named route no longer exists, the item is skipped instead of breaking the p
 ### Example: a dropdown menu
 
 A top-level item with children renders as a Filament dropdown group — exactly like
-the panel's native top navigation. The group label is the dropdown toggle; if the
-parent item also has its own URL, that link appears as the first entry inside the
-dropdown (so it stays reachable), matching Filament's grouping convention.
+the panel's native top navigation. The group label is a pure dropdown toggle and
+the children are its links. Like Filament's own groups, the toggle itself does not
+navigate: if a parent has children, its own `url`/`route` is ignored, so to make a
+landing page reachable add it as an explicit child item.
 
 ```php
 $services = TopbarMenuItem::create([
     'label' => 'Services',
-    'type' => 'url',
-    'url' => 'https://status.example.com', // optional — becomes the first dropdown entry; omit for a pure toggle
+    'type' => 'url', // a group with children is a toggle; its own url is not used
 ]);
 
 TopbarMenuItem::create([

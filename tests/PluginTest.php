@@ -147,7 +147,7 @@ class PluginTest extends TestCase
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://analytics.example.com',
             'parent_id' => $parent->id,
-            'target' => TopbarMenuItem::TARGET_SELF,
+            'target' => TopbarMenuItem::TARGET_BLANK,
         ]);
 
         TopbarMenuItem::create([
@@ -183,7 +183,12 @@ class PluginTest extends TestCase
         // The parent with children renders a dropdown containing its child link.
         $this->assertStringContainsString('href="https://analytics.example.com"', $html);
 
-        // The per-item target is honored: the "New tab" parent link gets _blank.
+        // The parent's own URL is NOT duplicated as a row inside its dropdown —
+        // the group is a pure toggle, matching Filament's native top navigation.
+        // (Its favicon URL still appears on the trigger, hence the distinct path.)
+        $this->assertStringNotContainsString('href="https://services.example.com"', $html);
+
+        // The per-item target is honored: the "New tab" child link gets _blank.
         $this->assertStringContainsString('target="_blank"', $html);
 
         // The favicon is rendered from the stored URL — no HTTP request needed.
