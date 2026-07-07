@@ -5,6 +5,18 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1]
+
+### Fixed
+
+- **The menu no longer 500s the whole panel when the cache returns an unusable
+  payload.** A serializing cache store (Redis, file, database) can hand back
+  `__PHP_Incomplete_Class` objects after a deploy or under a shared store, and
+  `visibleItems()` then hit a `TypeError` on its typed filter closure — on every
+  panel page. The cached tree is now validated and, when it isn't a clean
+  collection of models, dropped and rebuilt straight from the database, so a
+  poisoned entry self-heals instead of taking the panel down.
+
 ## [1.3.0]
 
 ### Security

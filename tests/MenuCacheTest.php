@@ -3,6 +3,7 @@
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
 use Illuminate\Auth\GenericUser;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Vaslv\FilamentTopbarMenu\Facades\TopbarMenu;
@@ -106,6 +107,36 @@ class MenuCacheTest extends TestCase
 
         $this->assertFalse(Cache::has(TopbarMenu::cacheKey()));
         $this->assertCount(0, TopbarMenu::items());
+    }
+
+    public function test_a_poisoned_cache_payload_is_rebuilt_from_the_database(): void
+    {
+        TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);
+
+        // A serializing store can hand back a collection of __PHP_Incomplete_Class
+        // objects; a non-model element stands in for that here. The menu must drop
+        // the unusable entry and rebuild from the database instead of trusting it.
+        Cache::put(TopbarMenu::cacheKey(), new EloquentCollection([new \stdClass]), 3600);
+
+        $items = TopbarMenu::items();
+
+        $this->assertCount(1, $items);
+        $this->assertInstanceOf(TopbarMenuItem::class, $items->first());
+        $this->assertSame('Real', $items->first()->label);
+    }
+
+    public function test_visible_items_survive_a_poisoned_cache_payload(): void
+    {
+        TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);
+
+        // Regression for the production fatal: visibleItems() filtered the cached
+        // tree through a closure typed `TopbarMenuItem $item`, so an incomplete
+        // object 500-ed every panel page. It must now degrade gracefully.
+        Cache::put(TopbarMenu::cacheKey(), new EloquentCollection([new \stdClass]), 3600);
+
+        $visible = TopbarMenu::visibleItems(null);
+
+        $this->assertSame(['Real'], $visible->pluck('label')->all());
     }
 
     public function test_visible_items_respect_visibility_rules(): void
