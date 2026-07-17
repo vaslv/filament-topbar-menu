@@ -22,8 +22,10 @@ use Filament\View\PanelsRenderHook;
 use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
+use ReflectionMethod;
 use ReflectionProperty;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
+use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
 use Vaslv\FilamentTopbarMenu\TopbarMenuPlugin;
@@ -227,5 +229,83 @@ class PluginTest extends TestCase
         // The link still renders, just without an icon.
         $this->assertStringContainsString('Typo icon', $html);
         $this->assertStringContainsString('href="https://example.com"', $html);
+    }
+
+    public function test_the_edit_form_fills_for_an_item_with_a_visibility_array(): void
+    {
+        $item = TopbarMenuItem::create([
+            'label' => 'Admin Tools',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => '/tools',
+            'visibility' => ['auth' => true, 'roles' => ['admin']],
+        ]);
+
+        $livewire = new class extends Component implements HasActions, HasSchemas
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+
+            /** @var array<string, mixed> */
+            public ?array $data = [];
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $schema = TopbarMenuItemResource::form(
+            Schema::make($livewire)->statePath('data')->model($item),
+        );
+
+        $page = new Pages\EditTopbarMenuItem;
+        $page->record = $item;
+
+        $fillMutator = new ReflectionMethod($page, 'mutateFormDataBeforeFill');
+
+        // Regression: the Select used to bind straight to the `visibility`
+        // array, and Filament's OptionStateCast strval()'d it during fill —
+        // "Array to string conversion" on every edit page of such an item.
+        $schema->fill($fillMutator->invoke($page, $item->attributesToArray()));
+
+        $rawState = $schema->getRawState();
+
+        $this->assertIsArray($rawState);
+        $this->assertSame('auth', $rawState['visibility_mode'] ?? null);
+    }
+
+    public function test_the_page_mutators_round_trip_visibility_and_preserve_roles(): void
+    {
+        $item = TopbarMenuItem::create([
+            'label' => 'Admin Tools',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => '/tools',
+            'visibility' => ['auth' => true, 'roles' => ['admin']],
+        ]);
+
+        $page = new Pages\EditTopbarMenuItem;
+        $page->record = $item;
+
+        $saveMutator = new ReflectionMethod($page, 'mutateFormDataBeforeSave');
+
+        /** @var array<string, mixed> $data */
+        $data = $saveMutator->invoke($page, ['label' => 'Admin Tools', 'visibility_mode' => 'guest']);
+
+        // The mode is remapped and the roles restriction survives the edit.
+        $this->assertSame(['roles' => ['admin'], 'guest' => true], $data['visibility']);
+        $this->assertArrayNotHasKey('visibility_mode', $data);
+
+        $createMutator = new ReflectionMethod(new Pages\CreateTopbarMenuItem, 'mutateFormDataBeforeCreate');
+
+        /** @var array<string, mixed> $created */
+        $created = $createMutator->invoke(new Pages\CreateTopbarMenuItem, ['label' => 'New', 'visibility_mode' => 'auth']);
+
+        $this->assertSame(['auth' => true], $created['visibility']);
+        $this->assertArrayNotHasKey('visibility_mode', $created);
+
+        /** @var array<string, mixed> $public */
+        $public = $createMutator->invoke(new Pages\CreateTopbarMenuItem, ['label' => 'New', 'visibility_mode' => null]);
+
+        $this->assertNull($public['visibility']);
     }
 }

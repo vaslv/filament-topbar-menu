@@ -144,7 +144,11 @@ class TopbarMenuItemResource extends Resource
                             ->placeholder(static::trans('fields.url.placeholder'))
                             ->url()
                             ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
-                            ->required(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
+                            // A dropdown group's own link is never used (the
+                            // toggle does not navigate), so an item that already
+                            // has children may be saved without one.
+                            ->required(fn (Get $get, ?TopbarMenuItem $record): bool => $get('type') === TopbarMenuItem::TYPE_URL
+                                && ! $record?->children()->exists())
                             ->columnSpanFull(),
 
                         Select::make('route')
@@ -159,7 +163,9 @@ class TopbarMenuItemResource extends Resource
                             )
                             ->searchable()
                             ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_ROUTE)
-                            ->required(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_ROUTE),
+                            // Same as `url`: optional for existing dropdown groups.
+                            ->required(fn (Get $get, ?TopbarMenuItem $record): bool => $get('type') === TopbarMenuItem::TYPE_ROUTE
+                                && ! $record?->children()->exists()),
 
                         KeyValue::make('route_parameters')
                             ->keyLabel(static::trans('fields.route_parameters.key'))
@@ -217,7 +223,15 @@ class TopbarMenuItemResource extends Resource
                                     }),
                             ),
 
-                        Select::make('visibility')
+                        // A Select cannot bind to the `visibility` JSON column
+                        // directly: Filament pipes a Select's raw state through
+                        // OptionStateCast (strval) during hydration — before
+                        // formatStateUsing runs — so an array state crashes with
+                        // "Array to string conversion". The form edits a virtual
+                        // `visibility_mode` string instead; the Create/Edit pages
+                        // map it from and back onto the `visibility` array,
+                        // preserving keys the form does not manage (`roles`).
+                        Select::make('visibility_mode')
                             ->label(static::trans('fields.visibility.label'))
                             ->placeholder(static::trans('fields.visibility.placeholder'))
                             ->options([
@@ -225,9 +239,7 @@ class TopbarMenuItemResource extends Resource
                                 'guest' => static::trans('fields.visibility.options.guest'),
                             ])
                             ->nullable()
-                            ->helperText(static::trans('fields.visibility.helper'))
-                            ->formatStateUsing(fn ($state): ?string => TopbarMenuItem::visibilityModeFromArray(is_array($state) ? $state : null))
-                            ->dehydrateStateUsing(fn ($state, ?TopbarMenuItem $record): ?array => TopbarMenuItem::applyVisibilityMode($record?->visibility, $state)),
+                            ->helperText(static::trans('fields.visibility.helper')),
 
                         TextInput::make('sort')
                             ->label(static::trans('fields.sort.label'))

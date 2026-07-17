@@ -5,6 +5,23 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2]
+
+### Fixed
+
+- **The edit page no longer 500s ("Array to string conversion") for items with
+  a visibility rule.** The "Visible to" Select was bound directly to the
+  `visibility` JSON column, and Filament casts a Select's raw state through
+  `OptionStateCast` (`strval()`) during form fill — before `formatStateUsing`
+  runs — so any stored visibility array crashed the page. The form now edits a
+  virtual `visibility_mode` string and the Create/Edit pages map it from and
+  back onto the `visibility` array, still preserving keys the form does not
+  manage (notably `roles`).
+- **Dropdown groups can now be saved from the form.** `url`/`route` were
+  unconditionally required for their link type, so a group (whose own link is
+  never used) could not be saved without one. They are now optional for items
+  that already have children.
+
 ## [1.4.1]
 
 ### Added
