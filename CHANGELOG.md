@@ -5,6 +5,19 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3]
+
+### Changed
+
+- **The demo seeder's role-restricted example ("Admin Tools") is now
+  adaptive.** The package cannot assume the host app has a roles system, and a
+  role-restricted item is hidden from everyone when the user model has no
+  `hasAnyRole()` method (the package fails closed) — so the seeded example
+  looked broken in apps without e.g. spatie/laravel-permission. The seeder now
+  seeds it only when the user model supports roles, and removes a previously
+  seeded example (matched by its exact seeded shape) when re-run after roles
+  support is gone.
+
 ## [1.4.2]
 
 ### Fixed

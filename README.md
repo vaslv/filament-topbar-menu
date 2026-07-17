@@ -108,6 +108,13 @@ php artisan db:seed --class="Vaslv\FilamentTopbarMenu\Database\Seeders\TopbarMen
 The seeder is idempotent: items are matched by parent + label, so re-running it
 updates the demo items in place instead of duplicating them.
 
+The role-restricted example group ("Admin Tools") is only seeded when your user
+model can evaluate roles — i.e. it has a `hasAnyRole()` method, e.g. from
+spatie/laravel-permission. Without roles support the package hides
+role-restricted items from everyone (it fails closed), so the seeder skips the
+example instead of seeding an item nobody can see — and removes it again on
+re-run if roles support has gone away.
+
 ### Example: external links
 
 ```php
