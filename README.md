@@ -95,6 +95,19 @@ Menu items live in the `filament_topbar_menu_items` table and are managed throug
 - **Active** toggle and **sort** order (rows can also be reordered by drag & drop)
 - **Visibility** — everyone, authenticated users only, or guests only
 
+### Demo data
+
+To try the menu out quickly, seed a demo tree that exercises every feature —
+external links, an internal route link, a dropdown group, visibility rules and
+an inactive item:
+
+```bash
+php artisan db:seed --class="Vaslv\FilamentTopbarMenu\Database\Seeders\TopbarMenuSeeder"
+```
+
+The seeder is idempotent: items are matched by parent + label, so re-running it
+updates the demo items in place instead of duplicating them.
+
 ### Example: external links
 
 ```php

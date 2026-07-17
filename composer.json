@@ -29,7 +29,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Vaslv\\FilamentTopbarMenu\\": "src/"
+            "Vaslv\\FilamentTopbarMenu\\": "src/",
+            "Vaslv\\FilamentTopbarMenu\\Database\\Seeders\\": "database/seeders/"
         }
     },
     "autoload-dev": {

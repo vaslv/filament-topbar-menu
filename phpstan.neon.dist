@@ -6,6 +6,7 @@ parameters:
 
     paths:
         - src
+        - database
 
     # The package ships without a full Laravel app; Larastan provides the
     # framework stubs it needs to analyse the source in isolation.

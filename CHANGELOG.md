@@ -5,6 +5,18 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1]
+
+### Added
+
+- **A demo seeder** (`Vaslv\FilamentTopbarMenu\Database\Seeders\TopbarMenuSeeder`)
+  that seeds a menu tree exercising every feature of the plugin: external URL
+  links, an internal route link, a dropdown group with children, per-item
+  targets and icons, visibility rules (auth / guest / roles) and an inactive
+  item. Idempotent — items are matched by parent + label, so re-running it
+  updates the demo items in place instead of duplicating them. Run it with
+  `php artisan db:seed --class="Vaslv\FilamentTopbarMenu\Database\Seeders\TopbarMenuSeeder"`.
+
 ## [1.4.0]
 
 ### Changed
