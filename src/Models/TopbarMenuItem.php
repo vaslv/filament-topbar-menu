@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
@@ -154,10 +153,12 @@ class TopbarMenuItem extends Model
 
             try {
                 return route($this->route, $this->route_parameters ?? []);
-            } catch (UrlGenerationException) {
-                // A required route parameter is missing or invalid. Skip the
-                // item instead of throwing — the menu renders on every panel
-                // page, so a single bad item would otherwise 500 the whole panel.
+            } catch (\Throwable) {
+                // A required route parameter is missing or invalid (a missing
+                // one throws UrlGenerationException; a non-scalar value throws a
+                // stringification ErrorException). Skip the item instead of
+                // throwing — the menu renders on every panel page, so a single
+                // bad item would otherwise 500 the whole panel.
                 return null;
             }
         }

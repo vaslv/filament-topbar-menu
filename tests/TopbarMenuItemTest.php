@@ -64,6 +64,25 @@ class TopbarMenuItemTest extends TestCase
         $this->assertNull($item->resolveUrl());
     }
 
+    public function test_it_returns_null_instead_of_throwing_for_a_non_scalar_route_parameter(): void
+    {
+        Route::get('/reports/{report}', fn () => 'ok')->name('reports.view');
+
+        $item = TopbarMenuItem::create([
+            'label' => 'Report',
+            'type' => TopbarMenuItem::TYPE_ROUTE,
+            'route' => 'reports.view',
+        ]);
+
+        // An array where a path parameter is expected throws an "Array to
+        // string conversion" ErrorException, not UrlGenerationException. The
+        // import validator blocks this, but resolveUrl must still fail safe for
+        // a value written directly to the column (seeder, manual SQL).
+        $item->forceFill(['route_parameters' => ['report' => ['nested']]])->save();
+
+        $this->assertNull($item->resolveUrl());
+    }
+
     public function test_the_per_item_target_is_honored_literally(): void
     {
         // "Same tab" must always mean same tab — even for an external URL and

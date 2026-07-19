@@ -88,6 +88,15 @@ return [
         'fetch_favicon' => 'Fetch favicon',
         'fetch_favicon_tooltip' => 'Resolve the favicon from the URL above',
         'fetch_favicons' => 'Fetch favicons',
+        'export' => 'Export',
+        'import' => 'Import',
+    ],
+
+    'import' => [
+        'description' => 'Upload a JSON file previously exported from this menu. Items are appended to the existing menu unless you enable the replace option.',
+        'file' => 'Export file (JSON)',
+        'replace' => 'Replace the current menu',
+        'replace_helper' => 'All existing menu items are deleted before importing.',
     ],
 
     'notifications' => [
@@ -96,6 +105,8 @@ return [
         'favicon_not_found' => 'No favicon found',
         'enter_url_first' => 'Enter an external URL first',
         'favicons_resolved' => ':count favicon(s) resolved',
+        'import_success' => ':count menu item(s) imported',
+        'import_invalid' => 'The file is not a valid topbar menu export',
     ],
 
     'command' => [

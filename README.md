@@ -192,6 +192,33 @@ The `visibility` JSON column supports:
 
 Visibility is evaluated per request — it is never baked into the cache.
 
+## Export & import
+
+The list page has **Export** and **Import** header actions for moving the whole
+menu between installs (e.g. staging → production) or keeping it as a backup.
+
+- **Export** downloads a JSON file with every item and all of its settings —
+  hierarchy, URLs/routes with parameters, targets, icons, favicons, sort order,
+  active state, and visibility rules (including `roles`).
+- **Import** accepts such a file and recreates the items. By default the items
+  are **appended** to the existing menu; enable *"Replace the current menu"* in
+  the import dialog to wipe the menu first. The whole file is validated before
+  anything is written, and the import runs in a single transaction — a broken
+  file never deletes or half-imports anything.
+
+Because the file is untrusted input, import re-applies the same guards as the
+form: URLs and favicon URLs must be plain `http(s)` links (a `javascript:` or
+`data:` link is rejected, never rendered into the topbar), route parameters must
+be scalar, visibility rules must be well-shaped, and the tree may be at most two
+levels deep. Export is gated behind the resource's *view* permission and import
+behind *create*; the replace option only appears for users the *delete* policy
+allows.
+
+The file contains no database ids (hierarchy is expressed by nesting), so an
+export from one application imports cleanly into another. Unknown keys are
+ignored, so a file from a newer plugin version still imports as long as its
+export format version is unchanged.
+
 ## Favicons
 
 For external links the plugin can resolve the site's favicon and store it in the `favicon_url` column, so **no remote HTTP request ever happens while the menu renders**.
