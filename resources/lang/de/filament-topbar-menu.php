@@ -88,6 +88,15 @@ return [
         'fetch_favicon' => 'Favicon abrufen',
         'fetch_favicon_tooltip' => 'Favicon aus der obigen URL ermitteln',
         'fetch_favicons' => 'Favicons abrufen',
+        'export' => 'Exportieren',
+        'import' => 'Importieren',
+    ],
+
+    'import' => [
+        'description' => 'Laden Sie eine zuvor aus diesem Menü exportierte JSON-Datei hoch. Einträge werden an das bestehende Menü angehängt, sofern das Ersetzen nicht aktiviert ist.',
+        'file' => 'Exportdatei (JSON)',
+        'replace' => 'Aktuelles Menü ersetzen',
+        'replace_helper' => 'Alle vorhandenen Menüeinträge werden vor dem Import gelöscht.',
     ],
 
     'notifications' => [
@@ -96,6 +105,8 @@ return [
         'favicon_not_found' => 'Kein Favicon gefunden',
         'enter_url_first' => 'Bitte zuerst eine externe URL eingeben',
         'favicons_resolved' => ':count Favicon(s) ermittelt',
+        'import_success' => ':count Menüeintrag/-einträge importiert',
+        'import_invalid' => 'Die Datei ist kein gültiger Menü-Export',
     ],
 
     'command' => [

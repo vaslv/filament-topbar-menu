@@ -106,6 +106,25 @@ class PluginTest extends TestCase
         $this->assertSame('sort', $table->getReorderColumn());
     }
 
+    public function test_the_list_page_defines_export_import_and_create_header_actions(): void
+    {
+        $this->app->setLocale('en');
+
+        $page = new Pages\ListTopbarMenuItems;
+
+        $actions = (new ReflectionMethod($page, 'getHeaderActions'))->invoke($page);
+
+        $this->assertSame(
+            ['export', 'import', 'create'],
+            array_map(fn ($action) => $action->getName(), $actions),
+        );
+
+        [$export, $import] = $actions;
+
+        $this->assertSame('Export', $export->getLabel());
+        $this->assertSame('Import', $import->getLabel());
+    }
+
     public function test_drag_and_drop_reordering_flushes_the_menu_cache(): void
     {
         TopbarMenuItem::create(['label' => 'A', 'type' => 'url', 'url' => '/a', 'sort' => 0]);

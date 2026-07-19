@@ -5,6 +5,25 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Export & import of the whole menu.** The list page gained Export and
+  Import header actions. Export downloads the full menu tree — every item with
+  all of its settings, including `route_parameters` and `visibility` rules —
+  as a portable JSON file without database ids. Import validates the whole
+  file up front, runs in a single transaction, and either appends to or (via a
+  toggle) replaces the current menu. Files with unknown extra keys import
+  cleanly, so exports from newer plugin versions stay usable.
+  Because an import file is untrusted input, it is held to the same guards as
+  the form: `url`/`favicon_url` must be plain `http(s)` links (blocking a
+  stored `javascript:`/`data:` link or a CSS `url()` breakout in the rendered
+  topbar), `route_parameters` must be scalar, `visibility` must be well-shaped,
+  string values are length-checked, and the tree may be at most two levels
+  deep. Export requires the resource's view permission and import its create
+  permission; the replace option is limited to users the delete policy allows.
+
 ## [1.4.3]
 
 ### Changed

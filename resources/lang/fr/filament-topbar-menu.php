@@ -88,6 +88,15 @@ return [
         'fetch_favicon' => 'Récupérer le favicon',
         'fetch_favicon_tooltip' => "Résoudre le favicon à partir de l'URL ci-dessus",
         'fetch_favicons' => 'Récupérer les favicons',
+        'export' => 'Exporter',
+        'import' => 'Importer',
+    ],
+
+    'import' => [
+        'description' => 'Téléversez un fichier JSON précédemment exporté depuis ce menu. Les éléments sont ajoutés au menu existant, sauf si le remplacement est activé.',
+        'file' => "Fichier d'export (JSON)",
+        'replace' => 'Remplacer le menu actuel',
+        'replace_helper' => "Tous les éléments de menu existants seront supprimés avant l'import.",
     ],
 
     'notifications' => [
@@ -96,6 +105,8 @@ return [
         'favicon_not_found' => 'Aucun favicon trouvé',
         'enter_url_first' => "Saisissez d'abord une URL externe",
         'favicons_resolved' => ':count favicon(s) résolu(s)',
+        'import_success' => ':count élément(s) de menu importé(s)',
+        'import_invalid' => "Le fichier n'est pas un export de menu valide",
     ],
 
     'command' => [
