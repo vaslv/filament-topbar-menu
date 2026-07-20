@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follow the configured connection. See the "Shared menu across projects"
   section in the README, including the switch procedure for existing installs
   and the operating notes for a shared database.
+- **Heroicon preview in the menu items table.** The admin table renders each
+  item's validated Heroicon; a favicon takes precedence over the icon,
+  mirroring the topbar.
+- **heroicons.com link in the icon helper.** The icon field's helper text now
+  links to the full Heroicons list, in every shipped locale.
 
 ### Changed
 
@@ -34,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured, so a routine `migrate:rollback` in one app cannot drop a menu
   database shared by a fleet of apps; `up()` also tolerates two apps racing to
   create the table on their first deploy.
+- Icon names containing `/` are rejected: Filament renders slash-strings as
+  `<img src="...">`, which would let a URL smuggled into the icon field (for
+  example via import) load an arbitrary external image in the admin table and
+  topbar. Unexpected icon-rendering failures are now reported instead of
+  silently swallowed.
+- The icon helper text escapes the translated string before substituting the
+  heroicons.com anchor, so an overridden or third-party locale cannot inject
+  raw HTML into the admin panel.
 
 ## [1.5.1]
 

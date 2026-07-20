@@ -153,6 +153,65 @@ class PluginTest extends TestCase
         $this->assertFalse(Cache::has(app(TopbarMenu::class)->cacheKey()));
     }
 
+    public function test_the_table_icon_column_prefers_the_favicon_and_validates_the_icon_name(): void
+    {
+        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+            use InteractsWithTable;
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $table = TopbarMenuItemResource::table(Table::make($livewire));
+        $column = $table->getColumn('icon');
+
+        // Mirrors the topbar: a favicon suppresses the Heroicon entirely.
+        $withFavicon = TopbarMenuItem::create([
+            'label' => 'Favicon wins',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'icon' => 'heroicon-o-home',
+            'favicon_url' => 'https://example.com/favicon.ico',
+        ]);
+
+        $this->assertNull($column->record($withFavicon)->getIcon($withFavicon->icon));
+
+        // Without a favicon, a known icon name renders as-is.
+        $withIcon = TopbarMenuItem::create([
+            'label' => 'Icon',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'icon' => 'heroicon-o-home',
+        ]);
+
+        $this->assertSame('heroicon-o-home', $column->record($withIcon)->getIcon($withIcon->icon));
+
+        // An unknown name must resolve to null instead of throwing SvgNotFound.
+        $withBadIcon = TopbarMenuItem::create([
+            'label' => 'Typo',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'icon' => 'not-a-real-icon-xyz',
+        ]);
+
+        $this->assertNull($column->record($withBadIcon)->getIcon($withBadIcon->icon));
+
+        // A URL smuggled into the icon field must not become an <img src>.
+        $withUrlIcon = TopbarMenuItem::create([
+            'label' => 'Smuggled image',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'icon' => 'https://attacker.example/pixel.svg',
+        ]);
+
+        $this->assertNull($column->record($withUrlIcon)->getIcon($withUrlIcon->icon));
+    }
+
     public function test_the_menu_view_renders_items_dropdowns_and_favicons(): void
     {
         $parent = TopbarMenuItem::create([
