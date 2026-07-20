@@ -291,10 +291,18 @@ command output and the menu's ARIA labels) is translatable. The package ships
 with:
 
 - English (`en`)
-- Russian (`ru`)
+- Arabic (`ar`)
 - German (`de`)
 - Spanish (`es`)
+- Persian (`fa`)
 - French (`fr`)
+- Indonesian (`id`)
+- Italian (`it`)
+- Dutch (`nl`)
+- Brazilian Portuguese (`pt_BR`)
+- Russian (`ru`)
+- Turkish (`tr`)
+- Chinese, Simplified (`zh_CN`)
 
 The language follows the application locale (`app()->setLocale(...)`), so nothing
 needs to be configured — set your app locale and the menu is translated.
@@ -306,7 +314,7 @@ php artisan vendor:publish --tag=filament-topbar-menu-translations
 ```
 
 They are published to `lang/vendor/filament-topbar-menu/{locale}/filament-topbar-menu.php`.
-To add a new language, copy the `en` file to a new locale folder (e.g. `it/`) and
+To add a new language, copy the `en` file to a new locale folder (e.g. `pl/`) and
 translate the values.
 
 ## Testing & code quality
