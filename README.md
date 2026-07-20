@@ -1,5 +1,9 @@
 # Filament Topbar Menu
 
+[![Packagist Version](https://img.shields.io/packagist/v/vaslv/filament-topbar-menu)](https://packagist.org/packages/vaslv/filament-topbar-menu)
+[![CI](https://github.com/vaslv/filament-topbar-menu/actions/workflows/tests.yml/badge.svg)](https://github.com/vaslv/filament-topbar-menu/actions/workflows/tests.yml)
+[![Plumb score](https://plumbphp.dev/badges/vaslv/filament-topbar-menu/composite.svg)](https://plumbphp.dev/vaslv/filament-topbar-menu)
+
 A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to the panel topbar, right after the logo. Use it to link to your other services (external URLs) or to pages of the current Laravel application (named routes) — with dropdowns, favicons, per-item visibility, and caching out of the box.
 
 - 🔗 **External URLs and internal Laravel routes** (with route parameters)
