@@ -37,7 +37,11 @@ class TranslationTest extends TestCase
         $reference = $flatten(require "{$langPath}/en/filament-topbar-menu.php");
         sort($reference);
 
-        foreach (['ru', 'de', 'es', 'fr'] as $locale) {
+        foreach ($this->shippedLocales() as $locale) {
+            if ($locale === 'en') {
+                continue;
+            }
+
             $keys = $flatten(require "{$langPath}/{$locale}/filament-topbar-menu.php");
             sort($keys);
 
@@ -47,5 +51,35 @@ class TranslationTest extends TestCase
                 "Locale [{$locale}] does not define the same translation keys as [en].",
             );
         }
+    }
+
+    public function test_every_locale_keeps_the_link_placeholder_in_the_icon_helper(): void
+    {
+        // The resource substitutes the heroicons.com anchor into :link; a
+        // translation that drops the placeholder silently loses the link.
+        foreach ($this->shippedLocales() as $locale) {
+            $lines = require __DIR__."/../resources/lang/{$locale}/filament-topbar-menu.php";
+
+            $this->assertStringContainsString(
+                ':link',
+                $lines['fields']['icon']['helper'],
+                "Locale [{$locale}] lost the :link placeholder in fields.icon.helper.",
+            );
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function shippedLocales(): array
+    {
+        $locales = array_map(
+            'basename',
+            glob(__DIR__.'/../resources/lang/*', GLOB_ONLYDIR) ?: [],
+        );
+
+        sort($locales);
+
+        return $locales;
     }
 }

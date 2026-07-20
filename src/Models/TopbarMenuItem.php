@@ -2,6 +2,7 @@
 
 namespace Vaslv\FilamentTopbarMenu\Models;
 
+use BladeUI\Icons\Exceptions\SvgNotFound;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -331,11 +332,28 @@ class TopbarMenuItem extends Model
             return null;
         }
 
+        // Filament renders any string containing "/" as an <img src="...">
+        // instead of an SVG icon (generate_icon_html), so a free-text or
+        // imported "icon" holding a URL would load an arbitrary external image
+        // in every visitor's browser. Images belong in favicon_url; this field
+        // only accepts registered icon names, which never contain slashes.
+        if (str_contains($icon, '/')) {
+            return null;
+        }
+
         try {
             \Filament\Support\generate_icon_html($icon);
 
             return $icon;
-        } catch (\Throwable) {
+        } catch (SvgNotFound) {
+            // Expected for a typo in the free-text field: no icon, no 500.
+            return null;
+        } catch (\Throwable $e) {
+            // Anything else (misregistered icon set, broken blade-icons cache,
+            // filesystem permissions) is a real fault — keep the page alive but
+            // surface it instead of silently blanking every icon.
+            report($e);
+
             return null;
         }
     }

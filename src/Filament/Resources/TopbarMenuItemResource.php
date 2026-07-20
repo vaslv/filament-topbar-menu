@@ -181,9 +181,13 @@ class TopbarMenuItemResource extends Resource
                         TextInput::make('icon')
                             ->label(static::trans('fields.icon.label'))
                             ->placeholder(static::trans('fields.icon.placeholder'))
-                            ->helperText(str(static::trans('fields.icon.helper', [
-                                'link' => '<a href="https://heroicons.com" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline dark:text-primary-400">heroicons.com</a>',
-                            ]))->toHtmlString()),
+                            // Escape the translator-controlled text FIRST, then
+                            // substitute the hardcoded anchor — so an overridden
+                            // or third-party locale stays HTML-inert instead of
+                            // becoming a raw-HTML sink in the admin panel.
+                            ->helperText(str(e(static::trans('fields.icon.helper')))
+                                ->replace(':link', '<a href="https://heroicons.com" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline dark:text-primary-400">heroicons.com</a>')
+                                ->toHtmlString()),
 
                         TextInput::make('favicon_url')
                             ->label(static::trans('fields.favicon_url.label'))
