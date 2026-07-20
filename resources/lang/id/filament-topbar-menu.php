@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Ikon',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Nama ikon apa pun yang didukung Filament, misalnya Heroicon.',
+            'helper' => 'Nama ikon apa pun yang didukung Filament, misalnya Heroicon. Lihat daftar lengkapnya di :link.',
         ],
         'favicon_url' => [
             'label' => 'URL favicon',

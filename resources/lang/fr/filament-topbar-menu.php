@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Icône',
             'placeholder' => 'heroicon-o-link',
-            'helper' => "N'importe quel nom d'icône pris en charge par Filament, par exemple une Heroicon.",
+            'helper' => "N'importe quel nom d'icône pris en charge par Filament, par exemple une Heroicon. Parcourez la liste complète sur :link.",
         ],
         'favicon_url' => [
             'label' => 'URL du favicon',

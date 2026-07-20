@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Pictogram',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Elke pictogramnaam die door Filament wordt ondersteund, bijvoorbeeld een Heroicon.',
+            'helper' => 'Elke pictogramnaam die door Filament wordt ondersteund, bijvoorbeeld een Heroicon. Bekijk de volledige lijst op :link.',
         ],
         'favicon_url' => [
             'label' => 'Favicon-URL',

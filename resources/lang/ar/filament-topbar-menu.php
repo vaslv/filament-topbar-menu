@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'الأيقونة',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'أي اسم أيقونة يدعمه Filament، مثل أيقونات Heroicon.',
+            'helper' => 'أي اسم أيقونة يدعمه Filament، مثل أيقونات Heroicon. تصفح القائمة الكاملة على :link.',
         ],
         'favicon_url' => [
             'label' => 'رابط أيقونة الموقع (favicon)',

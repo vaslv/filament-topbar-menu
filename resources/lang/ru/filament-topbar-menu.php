@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Иконка',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Любое имя иконки, поддерживаемое Filament, например Heroicon.',
+            'helper' => 'Любое имя иконки, поддерживаемое Filament, например Heroicon. Полный список — на :link.',
         ],
         'favicon_url' => [
             'label' => 'URL фавикона',

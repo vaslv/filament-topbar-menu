@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'آیکون',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'هر نام آیکونی که Filament پشتیبانی می‌کند، مثلاً یک Heroicon.',
+            'helper' => 'هر نام آیکونی که Filament پشتیبانی می‌کند، مثلاً یک Heroicon. فهرست کامل را در :link ببینید.',
         ],
         'favicon_url' => [
             'label' => 'آدرس فاوآیکون',
