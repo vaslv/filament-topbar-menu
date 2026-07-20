@@ -3,11 +3,6 @@
 
     /** @var \Illuminate\Database\Eloquent\Collection<int, TopbarMenuItem> $items */
     /** @var ?\Illuminate\Contracts\Auth\Authenticatable $user */
-
-    // Validate a free-text icon name before handing it to Filament: an unknown
-    // name would otherwise throw SvgNotFound and 500 every panel page. Favicons
-    // are passed separately as images and never go through this.
-    $ftmSafeIcon = fn (?string $icon): ?string => TopbarMenuItem::safeIconName($icon);
 @endphp
 
 @if ($items->isNotEmpty())
@@ -17,7 +12,10 @@
                 $children = $item->visibleChildren($user ?? null);
                 $url = $item->resolveUrl();
                 $itemNewTab = $item->resolveTarget() === TopbarMenuItem::TARGET_BLANK;
-                $itemIcon = $item->favicon_url ?: $ftmSafeIcon($item->icon);
+                // The favicon takes precedence over the (validated) icon; an
+                // unknown icon name resolves to null instead of a 500 — see
+                // TopbarMenuItem::displayIcon().
+                $itemIcon = $item->displayIcon();
             @endphp
 
             @if ($children->isEmpty())
@@ -53,7 +51,7 @@
                                     tag="a"
                                     :href="$childUrl"
                                     :image="$child->favicon_url"
-                                    :icon="$child->favicon_url ? null : $ftmSafeIcon($child->icon)"
+                                    :icon="$child->favicon_url ? null : TopbarMenuItem::safeIconName($child->icon)"
                                     :target="$child->resolveTarget() === TopbarMenuItem::TARGET_BLANK ? '_blank' : null"
                                     :color="$child->isActive() ? 'primary' : 'gray'"
                                 >

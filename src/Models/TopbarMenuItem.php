@@ -321,6 +321,17 @@ class TopbarMenuItem extends Model
     }
 
     /**
+     * The visual marker of the item exactly as the topbar renders it: the
+     * favicon URL when one is set (Filament renders slash-containing strings
+     * as an <img>), otherwise the validated icon name. Shared by the topbar
+     * view and the admin table so the two never disagree.
+     */
+    public function displayIcon(): ?string
+    {
+        return $this->favicon_url ?: static::safeIconName($this->icon);
+    }
+
+    /**
      * Validate a free-text icon name before handing it to Filament. An unknown
      * name would otherwise throw SvgNotFound and 500 the page, so callers get
      * null instead and can fall back to no icon. Favicons are images and never
