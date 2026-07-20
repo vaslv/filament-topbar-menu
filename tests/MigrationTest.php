@@ -31,4 +31,15 @@ class MigrationTest extends TestCase
             'updated_at',
         ]));
     }
+
+    public function test_rollback_drops_the_table_when_the_menu_uses_the_default_connection(): void
+    {
+        $migration = include __DIR__.'/../database/migrations/create_filament_topbar_menu_items_table.php';
+
+        // With no dedicated connection configured the table belongs to this
+        // app alone, so down() keeps its normal drop semantics.
+        $migration->down();
+
+        $this->assertFalse(Schema::hasTable('filament_topbar_menu_items'));
+    }
 }

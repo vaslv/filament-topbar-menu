@@ -260,7 +260,7 @@ return [
     // unchanged after an update. Set the optional FILAMENT_TOPBAR_MENU_DB_CONNECTION
     // env variable to a dedicated connection to keep the menu in a separate,
     // possibly shared, database (see "Shared menu across projects" below).
-    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION'),
+    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION') ?: null,
     'cache_key' => 'filament-topbar-menu.items',
     'cache_ttl' => 3600,
     'enable_favicons' => true,
@@ -293,12 +293,60 @@ FILAMENT_TOPBAR_MENU_DB_CONNECTION=menu
 ```
 
 The migration, every model query and the import transaction all follow this
-connection. Run the migration once against the shared database (for example
-`php artisan migrate --database=menu`, or simply `php artisan migrate` since the
-package migration reads the `connection` config itself). Each app keeps its own
-cache, which is flushed locally whenever that app edits an item — flush the
-others (`TopbarMenu::flushCache()`) or wait out `cache_ttl` for cross-app edits
-to appear.
+connection. Run the migration once against the shared database with plain
+`php artisan migrate` — the package migration reads the `connection` config
+itself, so only one app needs it pending for the table to be created. Do **not**
+use `php artisan migrate --database=menu`: that relocates the migration
+repository to the `menu` connection and replays *every* pending application
+migration against the shared database. If you must target the package migration
+explicitly, scope it by path:
+
+```bash
+php artisan migrate --path=vendor/vaslv/filament-topbar-menu/database/migrations --database=menu
+```
+
+Each app keeps its own cache, which is flushed locally whenever that app edits
+an item — flush the others (`TopbarMenu::flushCache()`) or wait out `cache_ttl`
+for cross-app edits to appear.
+
+### Switching an existing install
+
+On an existing install the package migration is already recorded in the app's
+own migrations table, so after setting `FILAMENT_TOPBAR_MENU_DB_CONNECTION`
+plain `php artisan migrate` will *skip* it — the menu table would never be
+created on the new connection and every menu query would fail once the cache
+expires. Move the menu explicitly:
+
+1. **Export** the current menu (the Export action on the menu items page)
+   while the old connection is still active.
+2. Set `FILAMENT_TOPBAR_MENU_DB_CONNECTION` and create the table on the new
+   connection with the path-scoped command above (or run `php artisan migrate`
+   from an app where the package migration is still pending).
+3. **Import** the exported file. The import flushes this app's cache; flush the
+   other apps' caches as described above.
+
+The old table stays behind on the previous connection — drop it manually once
+you have verified the move.
+
+### Operating notes for a shared menu
+
+- **Rollback is guarded.** When `connection` is set, the package migration's
+  `down()` is a no-op: a routine `migrate:rollback` in one app must not drop
+  the menu of the whole fleet. Dropping a shared menu table is a deliberate
+  manual step.
+- **Keep package versions in sync.** The create-only migration never alters an
+  existing table, so future schema changes ship as separate migrations. Apps
+  pinned to different package versions writing to one shared table are
+  unsupported — upgrade them together.
+- **Restrict who edits.** Every app with the resource enabled can edit the
+  shared menu. In apps that should only *render* it, disable the management UI
+  with `TopbarMenuPlugin::make()->resource(false)`; read-only database
+  credentials for the menu connection make a good second layer.
+- **Test suites.** Laravel's `RefreshDatabase` only wraps the app's default
+  connection in a transaction. If `FILAMENT_TOPBAR_MENU_DB_CONNECTION` leaks
+  into the test environment, feature tests write straight into the real shared
+  menu — and an import with `replace` wipes it. Unset the variable in
+  `phpunit.xml` or point it at a dedicated test connection.
 
 ## Caching
 

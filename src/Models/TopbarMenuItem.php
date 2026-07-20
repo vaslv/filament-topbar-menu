@@ -84,10 +84,12 @@ class TopbarMenuItem extends Model
 
     public function getConnectionName(): ?string
     {
-        // Null keeps the model on the application's default connection; a value
-        // routes every menu query to a dedicated connection, which lets several
-        // apps share one menu database (see the `connection` config option).
-        return config('filament-topbar-menu.connection') ?? parent::getConnectionName();
+        // An explicitly assigned connection (Model::on(), setConnection() — as
+        // used by tenancy or maintenance code) always wins. Otherwise the
+        // configured value routes every menu query to a dedicated connection,
+        // which lets several apps share one menu database (see the `connection`
+        // config option); null falls through to the app's default connection.
+        return parent::getConnectionName() ?? config('filament-topbar-menu.connection');
     }
 
     protected static function booted(): void
