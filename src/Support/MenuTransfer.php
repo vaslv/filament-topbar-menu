@@ -85,7 +85,12 @@ class MenuTransfer
 
         $this->validateItems($items, 'items', 1);
 
-        $created = DB::transaction(function () use ($items, $replace): int {
+        // Wrap the import in a transaction on the model's own connection, not
+        // the default one — otherwise a menu stored on a dedicated connection
+        // would run its writes outside the transaction entirely.
+        $connection = (new TopbarMenuItem)->getConnectionName();
+
+        $created = DB::connection($connection)->transaction(function () use ($items, $replace): int {
             if ($replace) {
                 TopbarMenuItem::query()->delete();
             }

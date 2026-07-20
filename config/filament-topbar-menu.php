@@ -15,6 +15,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Database connection
+    |--------------------------------------------------------------------------
+    |
+    | The database connection used to store menu items. Left unset, it resolves
+    | to null and follows the application's default connection — the one set by
+    | DB_CONNECTION — so no separate menu database is assumed and every existing
+    | install keeps working unchanged after an update. Set the optional
+    | FILAMENT_TOPBAR_MENU_DB_CONNECTION env variable (or edit this value) to a
+    | dedicated connection (defined in config/database.php) to keep the menu in
+    | a separate database — for example, one database shared by several apps so
+    | they all render a single, centrally managed menu.
+    |
+    | When a non-default connection is used, publish and run the migration on
+    | that connection (its schema must contain the menu items table).
+    |
+    */
+
+    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache
     |--------------------------------------------------------------------------
     |

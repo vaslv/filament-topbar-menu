@@ -82,6 +82,14 @@ class TopbarMenuItem extends Model
         return config('filament-topbar-menu.table_name', 'filament_topbar_menu_items');
     }
 
+    public function getConnectionName(): ?string
+    {
+        // Null keeps the model on the application's default connection; a value
+        // routes every menu query to a dedicated connection, which lets several
+        // apps share one menu database (see the `connection` config option).
+        return config('filament-topbar-menu.connection') ?? parent::getConnectionName();
+    }
+
     protected static function booted(): void
     {
         $flushCache = fn () => app(TopbarMenu::class)->flushCache();

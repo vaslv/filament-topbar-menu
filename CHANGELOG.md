@@ -5,6 +5,21 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Configurable database connection.** A new `connection` config option,
+  settable via the optional `FILAMENT_TOPBAR_MENU_DB_CONNECTION` env variable,
+  routes the menu table to a dedicated database connection. Left unset it
+  resolves to `null` and follows the application's default connection (the one
+  set by `DB_CONNECTION`), so no separate menu database is assumed and existing
+  installs keep working unchanged after updating. Set it to point several apps
+  at the same menu database and render one centrally managed menu across
+  projects. The migration, every model query and the import transaction all
+  follow the configured connection. See the "Shared menu across projects"
+  section in the README.
+
 ## [1.5.1]
 
 ### Added

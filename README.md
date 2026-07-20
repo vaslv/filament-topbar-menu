@@ -254,6 +254,13 @@ Disable the whole feature with `'enable_favicons' => false` in the config — th
 
 return [
     'table_name' => 'filament_topbar_menu_items',
+    // Database connection for the menu table. Unset it resolves to null and
+    // follows the app's default connection (the one set by DB_CONNECTION), so
+    // no separate menu database is assumed and existing installs keep working
+    // unchanged after an update. Set the optional FILAMENT_TOPBAR_MENU_DB_CONNECTION
+    // env variable to a dedicated connection to keep the menu in a separate,
+    // possibly shared, database (see "Shared menu across projects" below).
+    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION'),
     'cache_key' => 'filament-topbar-menu.items',
     'cache_ttl' => 3600,
     'enable_favicons' => true,
@@ -263,6 +270,35 @@ return [
     'open_external_links_in_new_tab' => true,
 ];
 ```
+
+## Shared menu across projects
+
+By default no separate menu database is assumed — the menu lives on the app's
+default connection. To move it onto a dedicated connection (defined in
+`config/database.php`), set the `FILAMENT_TOPBAR_MENU_DB_CONNECTION` env variable.
+Point several apps at the **same** menu database and they all render one
+centrally managed menu:
+
+```php
+// config/database.php
+'connections' => [
+    'menu' => [
+        'driver' => 'mysql',
+        // ...credentials for the shared menu database...
+    ],
+],
+
+// .env (in every app that shares the menu)
+FILAMENT_TOPBAR_MENU_DB_CONNECTION=menu
+```
+
+The migration, every model query and the import transaction all follow this
+connection. Run the migration once against the shared database (for example
+`php artisan migrate --database=menu`, or simply `php artisan migrate` since the
+package migration reads the `connection` config itself). Each app keeps its own
+cache, which is flushed locally whenever that app edits an item — flush the
+others (`TopbarMenu::flushCache()`) or wait out `cache_ttl` for cross-app edits
+to appear.
 
 ## Caching
 
