@@ -5,6 +5,17 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1]
+
+### Added
+
+- **Eight more UI locales.** The package now ships translations for Arabic
+  (`ar`), Persian (`fa`), Indonesian (`id`), Italian (`it`), Dutch (`nl`),
+  Brazilian Portuguese (`pt_BR`), Turkish (`tr`) and Simplified Chinese
+  (`zh_CN`), joining the existing `en`, `de`, `es`, `fr` and `ru`. Each locale
+  covers the full key set (resource form, table, actions, notifications and the
+  artisan command output).
+
 ## [1.5.0]
 
 ### Added
