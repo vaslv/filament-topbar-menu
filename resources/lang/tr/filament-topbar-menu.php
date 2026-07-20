@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Simge',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Filament tarafından desteklenen herhangi bir simge adı, örneğin bir Heroicon.',
+            'helper' => 'Filament tarafından desteklenen herhangi bir simge adı, örneğin bir Heroicon. Tüm listeye :link adresinden göz atabilirsiniz.',
         ],
         'favicon_url' => [
             'label' => 'Favicon URL\'si',

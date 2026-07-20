@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => 'Icon',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Any icon name supported by Filament, e.g. a Heroicon.',
+            'helper' => 'Any icon name supported by Filament, e.g. a Heroicon. Browse the full list at :link.',
         ],
         'favicon_url' => [
             'label' => 'Favicon URL',

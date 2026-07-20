@@ -180,7 +180,9 @@ class TopbarMenuItemResource extends Resource
                         TextInput::make('icon')
                             ->label(static::trans('fields.icon.label'))
                             ->placeholder(static::trans('fields.icon.placeholder'))
-                            ->helperText(static::trans('fields.icon.helper')),
+                            ->helperText(str(static::trans('fields.icon.helper', [
+                                'link' => '<a href="https://heroicons.com" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline dark:text-primary-400">heroicons.com</a>',
+                            ]))->toHtmlString()),
 
                         TextInput::make('favicon_url')
                             ->label(static::trans('fields.favicon_url.label'))

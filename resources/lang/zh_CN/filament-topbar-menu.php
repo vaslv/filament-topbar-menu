@@ -48,7 +48,7 @@ return [
         'icon' => [
             'label' => '图标',
             'placeholder' => 'heroicon-o-link',
-            'helper' => 'Filament 支持的任意图标名称，例如 Heroicon。',
+            'helper' => 'Filament 支持的任意图标名称，例如 Heroicon。可在 :link 查看完整列表。',
         ],
         'favicon_url' => [
             'label' => '网站图标 URL',
