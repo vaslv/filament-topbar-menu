@@ -10,11 +10,13 @@ return new class extends Migration
     {
         $tableName = config('filament-topbar-menu.table_name', 'filament_topbar_menu_items');
 
-        if (Schema::hasTable($tableName)) {
+        $schema = Schema::connection($this->getConnection());
+
+        if ($schema->hasTable($tableName)) {
             return;
         }
 
-        Schema::create($tableName, function (Blueprint $table) use ($tableName) {
+        $schema->create($tableName, function (Blueprint $table) use ($tableName) {
             $table->id();
             $table->foreignId('parent_id')
                 ->nullable()
@@ -39,6 +41,18 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists(config('filament-topbar-menu.table_name', 'filament_topbar_menu_items'));
+        Schema::connection($this->getConnection())
+            ->dropIfExists(config('filament-topbar-menu.table_name', 'filament_topbar_menu_items'));
+    }
+
+    /**
+     * The connection the menu table lives on. Null keeps the migration on the
+     * application's default connection; a value routes it to the dedicated
+     * connection configured for the package (see the `connection` config).
+     * Laravel's migrator also reads this to run the whole migration there.
+     */
+    public function getConnection(): ?string
+    {
+        return config('filament-topbar-menu.connection');
     }
 };
