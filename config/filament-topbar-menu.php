@@ -32,7 +32,10 @@ return [
     |
     */
 
-    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION'),
+    // `?:` normalizes a present-but-blank env value ('') to null, so a stray
+    // `FILAMENT_TOPBAR_MENU_DB_CONNECTION=` line cannot produce a '' connection
+    // name that only works by accident of DatabaseManager treating '' as falsy.
+    'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION') ?: null,
 
     /*
     |--------------------------------------------------------------------------

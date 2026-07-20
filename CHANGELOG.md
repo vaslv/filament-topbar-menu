@@ -5,7 +5,7 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0]
 
 ### Added
 
@@ -18,7 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at the same menu database and render one centrally managed menu across
   projects. The migration, every model query and the import transaction all
   follow the configured connection. See the "Shared menu across projects"
-  section in the README.
+  section in the README, including the switch procedure for existing installs
+  and the operating notes for a shared database.
+
+### Changed
+
+- A present-but-blank `FILAMENT_TOPBAR_MENU_DB_CONNECTION=` env line normalizes
+  to `null` (default connection) instead of producing an empty connection name.
+- An explicitly assigned model connection (`Model::on()`, `setConnection()`)
+  now takes precedence over the configured menu connection.
+
+### Security
+
+- The package migration's `down()` is a no-op when a dedicated connection is
+  configured, so a routine `migrate:rollback` in one app cannot drop a menu
+  database shared by a fleet of apps; `up()` also tolerates two apps racing to
+  create the table on their first deploy.
 
 ## [1.5.1]
 
