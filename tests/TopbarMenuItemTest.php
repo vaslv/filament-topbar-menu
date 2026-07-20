@@ -239,6 +239,26 @@ class TopbarMenuItemTest extends TestCase
         $this->assertFalse($rolesOnly->isVisibleTo($editor));
     }
 
+    public function test_display_icon_prefers_the_favicon_and_validates_the_icon_name(): void
+    {
+        $withFavicon = new TopbarMenuItem([
+            'icon' => 'heroicon-o-home',
+            'favicon_url' => 'https://example.com/favicon.ico',
+        ]);
+
+        $this->assertSame('https://example.com/favicon.ico', $withFavicon->displayIcon());
+
+        $withIcon = new TopbarMenuItem(['icon' => 'heroicon-o-home']);
+
+        $this->assertSame('heroicon-o-home', $withIcon->displayIcon());
+
+        $withBadIcon = new TopbarMenuItem(['icon' => 'not-a-real-icon-xyz']);
+
+        $this->assertNull($withBadIcon->displayIcon());
+
+        $this->assertNull((new TopbarMenuItem)->displayIcon());
+    }
+
     public function test_safe_icon_name_returns_known_heroicons_unchanged(): void
     {
         $this->assertSame('heroicon-o-home', TopbarMenuItem::safeIconName('heroicon-o-home'));

@@ -170,7 +170,9 @@ class PluginTest extends TestCase
         $table = TopbarMenuItemResource::table(Table::make($livewire));
         $column = $table->getColumn('icon');
 
-        // Mirrors the topbar: a favicon suppresses the Heroicon entirely.
+        // Mirrors the topbar: the favicon takes precedence over the Heroicon
+        // and is rendered by the column as an <img> (Filament renders any
+        // slash-containing icon string as an image source).
         $withFavicon = TopbarMenuItem::create([
             'label' => 'Favicon wins',
             'type' => TopbarMenuItem::TYPE_URL,
@@ -179,7 +181,10 @@ class PluginTest extends TestCase
             'favicon_url' => 'https://example.com/favicon.ico',
         ]);
 
-        $this->assertNull($column->record($withFavicon)->getIcon($withFavicon->icon));
+        $this->assertSame(
+            'https://example.com/favicon.ico',
+            $column->record($withFavicon)->getIcon($withFavicon->icon),
+        );
 
         // Without a favicon, a known icon name renders as-is.
         $withIcon = TopbarMenuItem::create([

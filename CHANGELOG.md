@@ -5,6 +5,16 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1]
+
+### Changed
+
+- **One icon column in the menu items table.** The separate favicon and icon
+  columns merged into a single column that renders exactly what the topbar
+  shows: the favicon (as an image) when set, otherwise the validated Heroicon.
+  The precedence rule now lives in one shared place —
+  `TopbarMenuItem::displayIcon()` — used by both the table and the topbar view.
+
 ## [1.6.0]
 
 ### Added
