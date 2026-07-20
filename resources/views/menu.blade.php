@@ -7,19 +7,7 @@
     // Validate a free-text icon name before handing it to Filament: an unknown
     // name would otherwise throw SvgNotFound and 500 every panel page. Favicons
     // are passed separately as images and never go through this.
-    $ftmSafeIcon = function (?string $icon): ?string {
-        if (blank($icon)) {
-            return null;
-        }
-
-        try {
-            \Filament\Support\generate_icon_html($icon);
-
-            return $icon;
-        } catch (\Throwable) {
-            return null;
-        }
-    };
+    $ftmSafeIcon = fn (?string $icon): ?string => TopbarMenuItem::safeIconName($icon);
 @endphp
 
 @if ($items->isNotEmpty())

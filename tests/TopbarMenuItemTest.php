@@ -238,4 +238,16 @@ class TopbarMenuItemTest extends TestCase
         $this->assertTrue($rolesOnly->isVisibleTo($admin));
         $this->assertFalse($rolesOnly->isVisibleTo($editor));
     }
+
+    public function test_safe_icon_name_returns_known_heroicons_unchanged(): void
+    {
+        $this->assertSame('heroicon-o-home', TopbarMenuItem::safeIconName('heroicon-o-home'));
+    }
+
+    public function test_safe_icon_name_returns_null_for_blank_or_unknown_names(): void
+    {
+        $this->assertNull(TopbarMenuItem::safeIconName(null));
+        $this->assertNull(TopbarMenuItem::safeIconName(''));
+        $this->assertNull(TopbarMenuItem::safeIconName('not-a-real-icon-xyz'));
+    }
 }
