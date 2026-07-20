@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
@@ -265,6 +266,16 @@ class TopbarMenuItemResource extends Resource
                     ->label('')
                     ->imageSize(16)
                     ->grow(false),
+
+                // Mirror the topbar: a favicon takes precedence over the icon,
+                // so this column only renders the (validated) Heroicon when no
+                // favicon is set. safeIconName() guards against unknown names.
+                IconColumn::make('icon')
+                    ->label('')
+                    ->grow(false)
+                    ->icon(fn (TopbarMenuItem $record): ?string => $record->favicon_url
+                        ? null
+                        : TopbarMenuItem::safeIconName($record->icon)),
 
                 TextColumn::make('label')
                     ->label(static::trans('fields.label'))

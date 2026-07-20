@@ -308,4 +308,25 @@ class TopbarMenuItem extends Model
 
         return $visibility === [] ? null : $visibility;
     }
+
+    /**
+     * Validate a free-text icon name before handing it to Filament. An unknown
+     * name would otherwise throw SvgNotFound and 500 the page, so callers get
+     * null instead and can fall back to no icon. Favicons are images and never
+     * go through here.
+     */
+    public static function safeIconName(?string $icon): ?string
+    {
+        if (blank($icon)) {
+            return null;
+        }
+
+        try {
+            \Filament\Support\generate_icon_html($icon);
+
+            return $icon;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 }
