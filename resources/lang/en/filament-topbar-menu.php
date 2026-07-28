@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Fetch favicons',
         'export' => 'Export',
         'import' => 'Import',
+        'create_table' => 'Create menu table',
+    ],
+
+    'missing_table' => [
+        'title' => 'Menu table not found',
+        'description' => 'The menu table does not exist on the configured database connection yet — usually right after switching FILAMENT_TOPBAR_MENU_DB_CONNECTION. The button above creates it; a menu still present on this app\'s default connection is copied over automatically.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon(s) resolved',
         'import_success' => ':count menu item(s) imported',
         'import_invalid' => 'The file is not a valid topbar menu export',
+        'table_created' => 'Menu table created',
+        'table_copied' => ':count menu item(s) copied from the default connection',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'No menu items need a favicon refresh.',
         'not_found' => 'not found',
         'resolved_summary' => 'Resolved :resolved of :total favicon(s).',
+        'table_created' => 'Menu table ":table" created on the ":connection" connection.',
+        'table_exists' => 'Menu table ":table" already exists on the ":connection" connection; nothing to do.',
+        'copied' => 'Copied :count menu item(s) from the default connection to ":connection".',
+        'copy_skipped_existing' => 'Copy skipped: the menu on ":connection" already has items; not merging this app\'s local menu into it.',
+        'copy_skipped_no_dedicated' => 'Copy skipped: no dedicated connection is configured; the menu already lives on the default connection.',
+        'copy_skipped_no_source' => 'Copy skipped: the default connection has no menu table to copy from.',
     ],
 
 ];

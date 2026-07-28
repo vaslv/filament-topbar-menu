@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Buscar favicons',
         'export' => 'Exportar',
         'import' => 'Importar',
+        'create_table' => 'Criar tabela do menu',
+    ],
+
+    'missing_table' => [
+        'title' => 'Tabela do menu não encontrada',
+        'description' => 'A tabela do menu ainda não existe na conexão de banco de dados configurada — geralmente logo após a troca de FILAMENT_TOPBAR_MENU_DB_CONNECTION. O botão acima a cria; um menu ainda presente na conexão padrão deste aplicativo é copiado automaticamente.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon(s) resolvido(s)',
         'import_success' => ':count item(ns) de menu importado(s)',
         'import_invalid' => 'O arquivo não é uma exportação válida do menu superior',
+        'table_created' => 'Tabela do menu criada',
+        'table_copied' => ':count item(ns) de menu copiado(s) da conexão padrão',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'Nenhum item de menu precisa de atualização de favicon.',
         'not_found' => 'não encontrado',
         'resolved_summary' => ':resolved de :total favicon(s) resolvido(s).',
+        'table_created' => 'A tabela do menu ":table" foi criada na conexão ":connection".',
+        'table_exists' => 'A tabela do menu ":table" já existe na conexão ":connection"; nada a fazer.',
+        'copied' => ':count item(ns) de menu copiado(s) da conexão padrão para ":connection".',
+        'copy_skipped_existing' => 'Cópia ignorada: o menu em ":connection" já tem itens; o menu local deste aplicativo não será mesclado.',
+        'copy_skipped_no_dedicated' => 'Cópia ignorada: nenhuma conexão dedicada configurada; o menu já vive na conexão padrão.',
+        'copy_skipped_no_source' => 'Cópia ignorada: a conexão padrão não tem tabela de menu para copiar.',
     ],
 
 ];

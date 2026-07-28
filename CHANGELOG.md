@@ -5,6 +5,43 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0]
+
+### Added
+
+- **`filament-topbar-menu:create-table` command.** Creates the menu table on
+  the configured connection without consulting the migration repository. This
+  closes the gap when an existing install switches to a dedicated connection
+  via `FILAMENT_TOPBAR_MENU_DB_CONNECTION`: the package migration is already
+  recorded in the app's own migrations table, so plain `php artisan migrate`
+  skips it and the table never appears on the new connection. The command is
+  idempotent (and race-safe against parallel first deploys of several apps
+  sharing one menu database), so it is safe to keep in deploy scripts
+  permanently. The table schema now lives in one shared class
+  (`Support\MenuTableSchema`) used by both the migration and the command.
+- **`--copy-from-default` flag on `create-table`.** Moves the data during the
+  same deploy step: when the dedicated menu is still empty and the app's
+  default connection still has a menu table, the local menu is copied onto
+  the dedicated connection through the export/import pipeline (validated, in
+  a transaction, cache flushed). A populated shared menu is never merged
+  into, so a second app joining the fleet cannot corrupt it.
+- **Panel-side recovery for a missing menu table.** When the menu table does
+  not exist on the configured connection, the menu items list page renders an
+  explanation instead of a 500, and users allowed to create menu items get a
+  "Create menu table" header action (next to Export/Import) that performs the
+  same create-and-copy as `create-table --copy-from-default` — so the switch
+  can be finished from the panel, without console access. Export, Import and
+  Create are hidden while the table is missing.
+
+### Fixed
+
+- **A missing menu table no longer 500s every panel page.** The topbar is
+  rendered on every page; during a connection switch there is a window where
+  the configured connection has no menu table yet. The menu now degrades to
+  an empty topbar and reports the error to the app's exception handler
+  instead of failing the request. The failure is never cached, so the menu
+  reappears on the first request after the table exists.
+
 ## [1.6.1]
 
 ### Changed

@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Favicons ophalen',
         'export' => 'Exporteren',
         'import' => 'Importeren',
+        'create_table' => 'Menutabel aanmaken',
+    ],
+
+    'missing_table' => [
+        'title' => 'Menutabel niet gevonden',
+        'description' => 'De menutabel bestaat nog niet op de geconfigureerde databaseverbinding — meestal direct na het omschakelen van FILAMENT_TOPBAR_MENU_DB_CONNECTION. De knop hierboven maakt de tabel aan; een menu dat nog op de standaardverbinding van deze app staat, wordt automatisch gekopieerd.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon(s) gevonden',
         'import_success' => ':count menu-item(s) geïmporteerd',
         'import_invalid' => 'Het bestand is geen geldige export van het topbalkmenu',
+        'table_created' => 'Menutabel aangemaakt',
+        'table_copied' => ':count menu-item(s) gekopieerd van de standaardverbinding',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'Geen menu-items hebben een favicon-update nodig.',
         'not_found' => 'niet gevonden',
         'resolved_summary' => ':resolved van :total favicon(s) gevonden.',
+        'table_created' => 'Menutabel ":table" is aangemaakt op de verbinding ":connection".',
+        'table_exists' => 'Menutabel ":table" bestaat al op de verbinding ":connection"; niets te doen.',
+        'copied' => ':count menu-item(s) gekopieerd van de standaardverbinding naar ":connection".',
+        'copy_skipped_existing' => 'Kopiëren overgeslagen: het menu op ":connection" bevat al items; het lokale menu van deze app wordt er niet mee samengevoegd.',
+        'copy_skipped_no_dedicated' => 'Kopiëren overgeslagen: er is geen speciale verbinding geconfigureerd; het menu staat al op de standaardverbinding.',
+        'copy_skipped_no_source' => 'Kopiëren overgeslagen: de standaardverbinding heeft geen menutabel om uit te kopiëren.',
     ],
 
 ];

@@ -297,17 +297,20 @@ FILAMENT_TOPBAR_MENU_DB_CONNECTION=menu
 ```
 
 The migration, every model query and the import transaction all follow this
-connection. Run the migration once against the shared database with plain
-`php artisan migrate` — the package migration reads the `connection` config
-itself, so only one app needs it pending for the table to be created. Do **not**
-use `php artisan migrate --database=menu`: that relocates the migration
-repository to the `menu` connection and replays *every* pending application
-migration against the shared database. If you must target the package migration
-explicitly, scope it by path:
+connection. On a fresh install plain `php artisan migrate` is enough — the
+package migration reads the `connection` config itself, so only one app needs
+it pending for the table to be created. To create the table explicitly,
+without touching any migration repository, use the dedicated command:
 
 ```bash
-php artisan migrate --path=vendor/vaslv/filament-topbar-menu/database/migrations --database=menu
+php artisan filament-topbar-menu:create-table
 ```
+
+It creates the menu table on the configured connection when it is missing and
+does nothing otherwise, so it is safe to keep in every app's deploy script.
+Do **not** use `php artisan migrate --database=menu`: that relocates the
+migration repository to the `menu` connection and replays *every* pending
+application migration against the shared database.
 
 Each app keeps its own cache, which is flushed locally whenever that app edits
 an item — flush the others (`TopbarMenu::flushCache()`) or wait out `cache_ttl`
@@ -317,20 +320,37 @@ for cross-app edits to appear.
 
 On an existing install the package migration is already recorded in the app's
 own migrations table, so after setting `FILAMENT_TOPBAR_MENU_DB_CONNECTION`
-plain `php artisan migrate` will *skip* it — the menu table would never be
-created on the new connection and every menu query would fail once the cache
-expires. Move the menu explicitly:
+plain `php artisan migrate` will *skip* it and the menu table never appears on
+the new connection. The whole switch is handled at deploy time: set the env
+variable and add one command to the deploy script, after `php artisan migrate`:
 
-1. **Export** the current menu (the Export action on the menu items page)
-   while the old connection is still active.
-2. Set `FILAMENT_TOPBAR_MENU_DB_CONNECTION` and create the table on the new
-   connection with the path-scoped command above (or run `php artisan migrate`
-   from an app where the package migration is still pending).
-3. **Import** the exported file. The import flushes this app's cache; flush the
-   other apps' caches as described above.
+```bash
+php artisan filament-topbar-menu:create-table --copy-from-default
+```
+
+It creates the table on the new connection, and `--copy-from-default` then
+moves the data: when the dedicated menu is still **empty** and this app's
+default connection still has a menu table, the local menu is copied over
+(validated like an import, in a transaction, cache flushed). A populated
+dedicated menu is never touched — the copy refuses to merge a second app's
+local menu into an already-seeded shared menu. Both steps are idempotent, so
+the command can stay in the deploy script permanently.
+
+Until the command has run, a missing menu table does not take the app down:
+the topbar renders an empty menu and reports the underlying error to the
+app's exception handler. The failure is never cached, so the menu reappears
+on the first request after the table exists.
+
+The switch can also be finished from the panel, without console access: when
+the table is missing, the menu items page renders an explanation instead of
+failing, and users allowed to create menu items get a **Create menu table**
+header action (next to Export/Import) that performs the same
+create-and-copy as the deploy command.
 
 The old table stays behind on the previous connection — drop it manually once
-you have verified the move.
+you have verified the move. For moves the copy flag does not cover (e.g.
+seeding an already-populated shared menu), use the Export/Import actions on
+the menu items page.
 
 ### Operating notes for a shared menu
 

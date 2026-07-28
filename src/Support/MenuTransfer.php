@@ -111,6 +111,35 @@ class MenuTransfer
     }
 
     /**
+     * Copy the app's local menu — the menu table on the default connection —
+     * onto the configured dedicated connection. The model resolves its
+     * connection from config at call time, so the export temporarily points
+     * the config at the default connection; the finally restores it even when
+     * the export throws, so a failure can never leave the whole package
+     * routed to the wrong database. Callers guard the preconditions (a
+     * dedicated connection is configured, its menu is empty, the source
+     * table exists) — see the create-table command and the list page.
+     *
+     * @return int The number of copied items.
+     *
+     * @throws InvalidArgumentException When a local row fails the import's validation.
+     */
+    public function copyFromDefaultConnection(): int
+    {
+        $dedicated = config('filament-topbar-menu.connection');
+
+        config(['filament-topbar-menu.connection' => null]);
+
+        try {
+            $payload = $this->export();
+        } finally {
+            config(['filament-topbar-menu.connection' => $dedicated]);
+        }
+
+        return $this->import($payload);
+    }
+
+    /**
      * @param  array<int, list<TopbarMenuItem>>  $byParent
      * @return list<array<string, mixed>>
      */

@@ -115,11 +115,11 @@ class PluginTest extends TestCase
         $actions = (new ReflectionMethod($page, 'getHeaderActions'))->invoke($page);
 
         $this->assertSame(
-            ['export', 'import', 'create'],
+            ['setupTable', 'export', 'import', 'create'],
             array_map(fn ($action) => $action->getName(), $actions),
         );
 
-        [$export, $import] = $actions;
+        [, $export, $import] = $actions;
 
         $this->assertSame('Export', $export->getLabel());
         $this->assertSame('Import', $import->getLabel());

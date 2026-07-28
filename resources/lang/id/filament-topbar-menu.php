@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Ambil favicon',
         'export' => 'Ekspor',
         'import' => 'Impor',
+        'create_table' => 'Buat tabel menu',
+    ],
+
+    'missing_table' => [
+        'title' => 'Tabel menu tidak ditemukan',
+        'description' => 'Tabel menu belum ada pada koneksi basis data yang dikonfigurasi — biasanya tepat setelah mengganti FILAMENT_TOPBAR_MENU_DB_CONNECTION. Tombol di atas akan membuatnya; menu yang masih ada pada koneksi bawaan aplikasi ini akan disalin secara otomatis.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon berhasil ditentukan',
         'import_success' => ':count item menu diimpor',
         'import_invalid' => 'File ini bukan ekspor menu bilah atas yang valid',
+        'table_created' => 'Tabel menu dibuat',
+        'table_copied' => ':count item menu disalin dari koneksi bawaan',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'Tidak ada item menu yang memerlukan pembaruan favicon.',
         'not_found' => 'tidak ditemukan',
         'resolved_summary' => ':resolved dari :total favicon berhasil ditentukan.',
+        'table_created' => 'Tabel menu ":table" dibuat pada koneksi ":connection".',
+        'table_exists' => 'Tabel menu ":table" sudah ada pada koneksi ":connection"; tidak ada yang perlu dilakukan.',
+        'copied' => ':count item menu disalin dari koneksi bawaan ke ":connection".',
+        'copy_skipped_existing' => 'Penyalinan dilewati: menu pada ":connection" sudah berisi item; menu lokal aplikasi ini tidak digabungkan.',
+        'copy_skipped_no_dedicated' => 'Penyalinan dilewati: tidak ada koneksi khusus yang dikonfigurasi; menu sudah berada pada koneksi bawaan.',
+        'copy_skipped_no_source' => 'Penyalinan dilewati: koneksi bawaan tidak memiliki tabel menu untuk disalin.',
     ],
 
 ];

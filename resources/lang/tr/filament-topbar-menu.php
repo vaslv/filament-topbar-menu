@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Favicon\'ları getir',
         'export' => 'Dışa aktar',
         'import' => 'İçe aktar',
+        'create_table' => 'Menü tablosunu oluştur',
+    ],
+
+    'missing_table' => [
+        'title' => 'Menü tablosu bulunamadı',
+        'description' => 'Menü tablosu, yapılandırılmış veritabanı bağlantısında henüz mevcut değil — genellikle FILAMENT_TOPBAR_MENU_DB_CONNECTION değiştirildikten hemen sonra. Yukarıdaki düğme tabloyu oluşturur; bu uygulamanın varsayılan bağlantısında hâlâ duran bir menü otomatik olarak kopyalanır.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon çözümlendi',
         'import_success' => ':count menü öğesi içe aktarıldı',
         'import_invalid' => 'Dosya geçerli bir üst menü dışa aktarımı değil',
+        'table_created' => 'Menü tablosu oluşturuldu',
+        'table_copied' => 'Varsayılan bağlantıdan :count menü öğesi kopyalandı',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'Favicon yenilemesi gereken menü öğesi yok.',
         'not_found' => 'bulunamadı',
         'resolved_summary' => ':total favicon\'dan :resolved tanesi çözümlendi.',
+        'table_created' => '":table" menü tablosu ":connection" bağlantısında oluşturuldu.',
+        'table_exists' => '":table" menü tablosu ":connection" bağlantısında zaten mevcut; yapılacak bir şey yok.',
+        'copied' => 'Varsayılan bağlantıdan ":connection" bağlantısına :count menü öğesi kopyalandı.',
+        'copy_skipped_existing' => 'Kopyalama atlandı: ":connection" üzerindeki menüde zaten öğeler var; bu uygulamanın yerel menüsü onunla birleştirilmedi.',
+        'copy_skipped_no_dedicated' => 'Kopyalama atlandı: özel bir bağlantı yapılandırılmamış; menü zaten varsayılan bağlantıda.',
+        'copy_skipped_no_source' => 'Kopyalama atlandı: varsayılan bağlantıda kopyalanacak bir menü tablosu yok.',
     ],
 
 ];

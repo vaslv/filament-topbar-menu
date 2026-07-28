@@ -4,6 +4,7 @@ namespace Vaslv\FilamentTopbarMenu;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
@@ -24,15 +25,29 @@ class TopbarMenu
      */
     public function items(): Collection
     {
-        $cached = $this->remember();
+        try {
+            $cached = $this->remember();
 
-        if (! $this->isValidSnapshot($cached)) {
-            // A stale entry from a release that cached models instead of arrays,
-            // or a corrupted value. Replace it with a fresh snapshot rather than
-            // letting the render path choke on an unusable payload.
-            $cached = $this->snapshot();
+            if (! $this->isValidSnapshot($cached)) {
+                // A stale entry from a release that cached models instead of arrays,
+                // or a corrupted value. Replace it with a fresh snapshot rather than
+                // letting the render path choke on an unusable payload.
+                $cached = $this->snapshot();
 
-            Cache::put($this->cacheKey(), $cached, config('filament-topbar-menu.cache_ttl', 3600));
+                Cache::put($this->cacheKey(), $cached, config('filament-topbar-menu.cache_ttl', 3600));
+            }
+        } catch (QueryException $e) {
+            // The menu is chrome rendered on every panel page — it must never
+            // take the whole app down. The typical trigger: an install switched
+            // to a dedicated connection whose table does not exist yet (the
+            // create-table deploy step has not run). Degrade to an empty menu
+            // and report the error instead of failing every request. Nothing is
+            // cached on this path — Cache::remember stores only a successful
+            // snapshot — so the menu reappears on the first request after the
+            // table exists.
+            report($e);
+
+            return new Collection;
         }
 
         return $this->hydrate($cached);

@@ -1,53 +1,19 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Vaslv\FilamentTopbarMenu\Support\MenuTableSchema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        $tableName = config('filament-topbar-menu.table_name', 'filament_topbar_menu_items');
-
-        $schema = Schema::connection($this->getConnection());
-
-        if ($schema->hasTable($tableName)) {
-            return;
-        }
-
-        try {
-            $schema->create($tableName, function (Blueprint $table) use ($tableName) {
-                $table->id();
-                $table->foreignId('parent_id')
-                    ->nullable()
-                    ->constrained($tableName)
-                    ->cascadeOnDelete();
-                $table->string('label');
-                $table->string('type')->default('url');
-                $table->string('url')->nullable();
-                $table->string('route')->nullable();
-                $table->json('route_parameters')->nullable();
-                $table->string('target')->default('_self');
-                $table->string('icon')->nullable();
-                $table->string('favicon_url')->nullable();
-                $table->boolean('is_active')->default(true);
-                $table->integer('sort')->default(0);
-                $table->json('visibility')->nullable();
-                $table->timestamps();
-
-                $table->index(['parent_id', 'is_active', 'sort']);
-            });
-        } catch (QueryException $e) {
-            // Two apps sharing one menu database can race between hasTable()
-            // and create() on their first deploy. The loser's "table already
-            // exists" error means the table is there — the desired end state —
-            // so only rethrow when the table genuinely failed to appear.
-            if (! $schema->hasTable($tableName)) {
-                throw $e;
-            }
-        }
+        // The schema lives in MenuTableSchema, shared with the create-table
+        // command: on installs switched to a dedicated connection later in
+        // life this migration is already recorded as ran, so the command is
+        // the supported way to create the table there. Both stay identical
+        // by construction. ensure() is idempotent and race-safe.
+        (new MenuTableSchema)->ensure();
     }
 
     public function down(): void

@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Favicons abrufen',
         'export' => 'Exportieren',
         'import' => 'Importieren',
+        'create_table' => 'Menütabelle erstellen',
+    ],
+
+    'missing_table' => [
+        'title' => 'Menütabelle nicht gefunden',
+        'description' => 'Die Menütabelle existiert auf der konfigurierten Datenbankverbindung noch nicht — meist direkt nach dem Umschalten von FILAMENT_TOPBAR_MENU_DB_CONNECTION. Die Schaltfläche oben erstellt sie; ein noch auf der Standardverbindung dieser App vorhandenes Menü wird automatisch übernommen.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count Favicon(s) ermittelt',
         'import_success' => ':count Menüeintrag/-einträge importiert',
         'import_invalid' => 'Die Datei ist kein gültiger Menü-Export',
+        'table_created' => 'Menütabelle erstellt',
+        'table_copied' => ':count Menüeintrag/-einträge von der Standardverbindung kopiert',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => 'Keine Menüeinträge benötigen eine Favicon-Aktualisierung.',
         'not_found' => 'nicht gefunden',
         'resolved_summary' => ':resolved von :total Favicon(s) ermittelt.',
+        'table_created' => 'Menütabelle ":table" wurde auf der Verbindung ":connection" erstellt.',
+        'table_exists' => 'Menütabelle ":table" existiert bereits auf der Verbindung ":connection"; nichts zu tun.',
+        'copied' => ':count Menüeintrag/-einträge von der Standardverbindung nach ":connection" kopiert.',
+        'copy_skipped_existing' => 'Kopieren übersprungen: Das Menü auf ":connection" enthält bereits Einträge; das lokale Menü dieser App wird nicht hineingemischt.',
+        'copy_skipped_no_dedicated' => 'Kopieren übersprungen: Keine dedizierte Verbindung konfiguriert; das Menü liegt bereits auf der Standardverbindung.',
+        'copy_skipped_no_source' => 'Kopieren übersprungen: Auf der Standardverbindung gibt es keine Menütabelle zum Kopieren.',
     ],
 
 ];

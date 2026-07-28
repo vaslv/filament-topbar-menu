@@ -3,6 +3,7 @@
 namespace Vaslv\FilamentTopbarMenu;
 
 use Illuminate\Support\ServiceProvider;
+use Vaslv\FilamentTopbarMenu\Commands\CreateTableCommand;
 use Vaslv\FilamentTopbarMenu\Commands\RefreshFaviconsCommand;
 use Vaslv\FilamentTopbarMenu\Support\FaviconResolver;
 
@@ -24,6 +25,7 @@ class TopbarMenuServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                CreateTableCommand::class,
                 RefreshFaviconsCommand::class,
             ]);
 

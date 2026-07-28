@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => 'Récupérer les favicons',
         'export' => 'Exporter',
         'import' => 'Importer',
+        'create_table' => 'Créer la table du menu',
+    ],
+
+    'missing_table' => [
+        'title' => 'Table du menu introuvable',
+        'description' => 'La table du menu n\'existe pas encore sur la connexion de base de données configurée — généralement juste après le changement de FILAMENT_TOPBAR_MENU_DB_CONNECTION. Le bouton ci-dessus la crée ; un menu encore présent sur la connexion par défaut de cette application est copié automatiquement.',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => ':count favicon(s) résolu(s)',
         'import_success' => ':count élément(s) de menu importé(s)',
         'import_invalid' => "Le fichier n'est pas un export de menu valide",
+        'table_created' => 'Table du menu créée',
+        'table_copied' => ':count élément(s) de menu copié(s) depuis la connexion par défaut',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => "Aucun élément de menu n'a besoin d'une mise à jour de favicon.",
         'not_found' => 'introuvable',
         'resolved_summary' => ':resolved favicon(s) résolu(s) sur :total.',
+        'table_created' => 'La table du menu « :table » a été créée sur la connexion « :connection ».',
+        'table_exists' => 'La table du menu « :table » existe déjà sur la connexion « :connection » ; rien à faire.',
+        'copied' => ':count élément(s) de menu copié(s) depuis la connexion par défaut vers « :connection ».',
+        'copy_skipped_existing' => 'Copie ignorée : le menu sur « :connection » contient déjà des éléments ; le menu local de cette application n\'y est pas fusionné.',
+        'copy_skipped_no_dedicated' => 'Copie ignorée : aucune connexion dédiée n\'est configurée ; le menu se trouve déjà sur la connexion par défaut.',
+        'copy_skipped_no_source' => 'Copie ignorée : la connexion par défaut n\'a pas de table de menu à copier.',
     ],
 
 ];

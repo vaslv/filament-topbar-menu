@@ -90,6 +90,12 @@ return [
         'fetch_favicons' => '获取网站图标',
         'export' => '导出',
         'import' => '导入',
+        'create_table' => '创建菜单表',
+    ],
+
+    'missing_table' => [
+        'title' => '未找到菜单表',
+        'description' => '菜单表在配置的数据库连接上尚不存在——通常发生在切换 FILAMENT_TOPBAR_MENU_DB_CONNECTION 之后。点击上方按钮即可创建；如果本应用默认连接上仍有菜单，将自动复制过来。',
     ],
 
     'import' => [
@@ -107,6 +113,8 @@ return [
         'favicons_resolved' => '已解析 :count 个网站图标',
         'import_success' => '已导入 :count 个菜单项',
         'import_invalid' => '该文件不是有效的顶栏菜单导出文件',
+        'table_created' => '菜单表已创建',
+        'table_copied' => '已从默认连接复制 :count 个菜单项',
     ],
 
     'command' => [
@@ -114,6 +122,12 @@ return [
         'nothing_to_refresh' => '没有需要刷新网站图标的菜单项。',
         'not_found' => '未找到',
         'resolved_summary' => '已解析 :resolved / :total 个网站图标。',
+        'table_created' => '菜单表 “:table” 已在 “:connection” 连接上创建。',
+        'table_exists' => '菜单表 “:table” 已存在于 “:connection” 连接上，无需操作。',
+        'copied' => '已从默认连接复制 :count 个菜单项到 “:connection”。',
+        'copy_skipped_existing' => '已跳过复制：“:connection” 上的菜单已有菜单项，不会合并本应用的本地菜单。',
+        'copy_skipped_no_dedicated' => '已跳过复制：未配置专用连接，菜单已位于默认连接上。',
+        'copy_skipped_no_source' => '已跳过复制：默认连接上没有可供复制的菜单表。',
     ],
 
 ];
