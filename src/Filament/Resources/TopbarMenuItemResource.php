@@ -283,10 +283,18 @@ class TopbarMenuItemResource extends Resource
                 // takes precedence over the validated Heroicon. displayIcon()
                 // is the same helper the topbar view uses, so the table and
                 // the rendered menu never disagree.
-                IconColumn::make('icon')
+                //
+                // The column's STATE — not just its ->icon() — has to be
+                // displayIcon(): IconColumn::toEmbeddedHtml() returns the empty
+                // placeholder for a blank state before it ever calls the
+                // ->icon() closure. Bound to the `icon` attribute, every item
+                // that carries a favicon but no Heroicon name (the common case
+                // for external links) therefore rendered as an empty cell.
+                IconColumn::make('display_icon')
                     ->label('')
                     ->grow(false)
-                    ->icon(fn (TopbarMenuItem $record): ?string => $record->displayIcon()),
+                    ->state(fn (TopbarMenuItem $record): ?string => $record->displayIcon())
+                    ->icon(fn (?string $state): ?string => $state),
 
                 TextColumn::make('label')
                     ->label(static::trans('fields.label'))

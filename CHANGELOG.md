@@ -5,6 +5,20 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1]
+
+### Fixed
+
+- **Favicons are visible again in the menu items table.** The table's visual
+  column was bound to the `icon` attribute while its icon came from
+  `displayIcon()`, and Filament's `IconColumn` renders the empty-cell
+  placeholder for a blank column *state* before it ever consults the icon
+  closure. Every item carrying a favicon but no Heroicon name — the normal
+  shape of an external link — therefore showed an empty cell, while items that
+  happened to have both did show their favicon. The column now takes
+  `displayIcon()` as its state, so the table matches the rendered topbar in
+  every case.
+
 ## [1.8.0]
 
 ### Added

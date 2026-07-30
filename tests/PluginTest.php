@@ -48,6 +48,33 @@ class PluginTest extends TestCase
         ]);
     }
 
+    /**
+     * The resource's table, standing on its own outside a panel: a bare host
+     * component plus the table property InteractsWithTable would normally
+     * initialize during a real Livewire boot. Column state resolution reaches
+     * back into that property, so a hand-built table has to wire it up.
+     */
+    protected function menuItemsTable(): Table
+    {
+        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+            use InteractsWithTable;
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $table = TopbarMenuItemResource::table(Table::make($livewire));
+
+        (new ReflectionProperty($livewire, 'table'))->setValue($livewire, $table);
+
+        return $table;
+    }
+
     public function test_the_plugin_registers_the_resource_and_the_topbar_render_hook(): void
     {
         $panel = Panel::make()->id('test');
@@ -90,19 +117,7 @@ class PluginTest extends TestCase
 
         $this->assertNotEmpty($schema->getComponents());
 
-        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
-        {
-            use InteractsWithActions;
-            use InteractsWithSchemas;
-            use InteractsWithTable;
-
-            public function render(): string
-            {
-                return '';
-            }
-        };
-
-        $table = TopbarMenuItemResource::table(Table::make($livewire));
+        $table = $this->menuItemsTable();
 
         $this->assertNotEmpty($table->getColumns());
         $this->assertSame('sort', $table->getReorderColumn());
@@ -132,19 +147,7 @@ class PluginTest extends TestCase
         TopbarMenuItem::create(['label' => 'A', 'type' => 'url', 'url' => '/a', 'sort' => 0]);
         TopbarMenuItem::create(['label' => 'B', 'type' => 'url', 'url' => '/b', 'sort' => 1]);
 
-        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
-        {
-            use InteractsWithActions;
-            use InteractsWithSchemas;
-            use InteractsWithTable;
-
-            public function render(): string
-            {
-                return '';
-            }
-        };
-
-        $table = TopbarMenuItemResource::table(Table::make($livewire));
+        $table = $this->menuItemsTable();
 
         // Prime the cache, then simulate Filament's post-reorder callback.
         app(TopbarMenu::class)->items();
@@ -157,20 +160,26 @@ class PluginTest extends TestCase
 
     public function test_the_table_icon_column_prefers_the_favicon_and_validates_the_icon_name(): void
     {
-        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
-        {
-            use InteractsWithActions;
-            use InteractsWithSchemas;
-            use InteractsWithTable;
+        $column = $this->menuItemsTable()->getColumn('display_icon');
 
-            public function render(): string
-            {
-                return '';
-            }
-        };
+        $this->assertNotNull($column);
 
-        $table = TopbarMenuItemResource::table(Table::make($livewire));
-        $column = $table->getColumn('icon');
+        // Assert on the rendered HTML, not on getIcon(): IconColumn returns the
+        // empty-cell placeholder for a blank column state before it ever calls
+        // the ->icon() closure, so only a real render proves that a favicon
+        // actually reaches the page.
+        $render = fn (TopbarMenuItem $record): string => $column->record($record)->toHtml();
+
+        // The regression this guards: an external link typically carries a
+        // favicon and no Heroicon name at all. It must still show its favicon.
+        $faviconOnly = TopbarMenuItem::create([
+            'label' => 'Favicon only',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'favicon_url' => 'https://example.com/favicon.ico',
+        ]);
+
+        $this->assertStringContainsString('<img src="https://example.com/favicon.ico"', $render($faviconOnly));
 
         // Mirrors the topbar: the favicon takes precedence over the Heroicon
         // and is rendered by the column as an <img> (Filament renders any
@@ -180,15 +189,15 @@ class PluginTest extends TestCase
             'type' => TopbarMenuItem::TYPE_URL,
             'url' => 'https://example.com',
             'icon' => 'heroicon-o-home',
-            'favicon_url' => 'https://example.com/favicon.ico',
+            'favicon_url' => 'https://example.com/other-favicon.ico',
         ]);
 
-        $this->assertSame(
-            'https://example.com/favicon.ico',
-            $column->record($withFavicon)->getIcon($withFavicon->icon),
-        );
+        $html = $render($withFavicon);
 
-        // Without a favicon, a known icon name renders as-is.
+        $this->assertStringContainsString('<img src="https://example.com/other-favicon.ico"', $html);
+        $this->assertStringNotContainsString('<svg', $html);
+
+        // Without a favicon, a known icon name renders as the Heroicon's SVG.
         $withIcon = TopbarMenuItem::create([
             'label' => 'Icon',
             'type' => TopbarMenuItem::TYPE_URL,
@@ -196,9 +205,9 @@ class PluginTest extends TestCase
             'icon' => 'heroicon-o-home',
         ]);
 
-        $this->assertSame('heroicon-o-home', $column->record($withIcon)->getIcon($withIcon->icon));
+        $this->assertStringContainsString('<svg', $render($withIcon));
 
-        // An unknown name must resolve to null instead of throwing SvgNotFound.
+        // An unknown name must render nothing instead of throwing SvgNotFound.
         $withBadIcon = TopbarMenuItem::create([
             'label' => 'Typo',
             'type' => TopbarMenuItem::TYPE_URL,
@@ -206,7 +215,7 @@ class PluginTest extends TestCase
             'icon' => 'not-a-real-icon-xyz',
         ]);
 
-        $this->assertNull($column->record($withBadIcon)->getIcon($withBadIcon->icon));
+        $this->assertStringNotContainsString('<svg', $render($withBadIcon));
 
         // A URL smuggled into the icon field must not become an <img src>.
         $withUrlIcon = TopbarMenuItem::create([
@@ -216,34 +225,14 @@ class PluginTest extends TestCase
             'icon' => 'https://attacker.example/pixel.svg',
         ]);
 
-        $this->assertNull($column->record($withUrlIcon)->getIcon($withUrlIcon->icon));
+        $this->assertStringNotContainsString('<img', $render($withUrlIcon));
     }
 
     public function test_the_table_badge_marks_items_hidden_on_the_current_domain(): void
     {
         $this->bindRequest('https://a.example.com/admin');
 
-        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
-        {
-            use InteractsWithActions;
-            use InteractsWithSchemas;
-            use InteractsWithTable;
-
-            public function render(): string
-            {
-                return '';
-            }
-        };
-
-        $table = TopbarMenuItemResource::table(Table::make($livewire));
-
-        // getState() resolves through the host component's table property,
-        // which InteractsWithTable only initializes during a real Livewire
-        // boot — wire it up by hand for this standalone table.
-        $tableProperty = new ReflectionProperty($livewire, 'table');
-        $tableProperty->setValue($livewire, $table);
-
-        $column = $table->getColumn('hidden_on_current_domain');
+        $column = $this->menuItemsTable()->getColumn('hidden_on_current_domain');
 
         $this->assertNotNull($column);
 
