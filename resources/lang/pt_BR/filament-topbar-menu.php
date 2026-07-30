@@ -62,6 +62,10 @@ return [
                 'guest' => 'Apenas visitantes',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Ocultar no próprio domínio',
+            'helper' => 'O item não é exibido no serviço cujo domínio coincide com o do link — para um menu compartilhado entre vários serviços.',
+        ],
         'sort' => [
             'label' => 'Ordem',
             'helper' => 'Valores menores são exibidos primeiro. Você também pode arrastar as linhas na lista.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Abrir em',
         'is_active' => 'Ativo',
         'sort' => 'Ordem',
+        'hidden_on_current_domain' => 'Oculto neste domínio',
+        'hidden_on_current_domain_tooltip' => 'Oculto neste domínio; visível nos demais serviços da frota.',
     ],
 
     'filters' => [

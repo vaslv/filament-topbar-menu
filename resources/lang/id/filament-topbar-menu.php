@@ -62,6 +62,10 @@ return [
                 'guest' => 'Hanya tamu',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Sembunyikan di domainnya sendiri',
+            'helper' => 'Item tidak ditampilkan pada layanan yang domainnya sama dengan domain tautan — untuk satu menu bersama beberapa layanan.',
+        ],
         'sort' => [
             'label' => 'Urutan',
             'helper' => 'Nilai yang lebih kecil ditampilkan lebih dulu. Anda juga dapat menyeret baris di daftar.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Buka di',
         'is_active' => 'Aktif',
         'sort' => 'Urutan',
+        'hidden_on_current_domain' => 'Disembunyikan di domain ini',
+        'hidden_on_current_domain_tooltip' => 'Disembunyikan di domain ini; tetap terlihat di layanan armada lainnya.',
     ],
 
     'filters' => [

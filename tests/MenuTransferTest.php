@@ -247,6 +247,15 @@ class MenuTransferTest extends TestCase
             'data scheme' => ['data:text/html,<script>alert(1)</script>'],
             'scheme-relative' => ['//evil.example.com/x'],
             'root-relative' => ['/admin/x'],
+            // Not dangerous, but they must stay unreachable through the import
+            // so pointsAtCurrentHost()'s no-host branches remain defensive-only.
+            'mailto scheme' => ['mailto:team@example.com'],
+            'tel scheme' => ['tel:+123456789'],
+            // Scheme without a host: parses as scheme+path, browsers read the
+            // href differently than PHP, and the hide_on_current_domain flag
+            // could never match it.
+            'scheme-only, no host' => ['http:foo'],
+            'scheme with empty host' => ['http://'],
         ];
     }
 
@@ -360,6 +369,50 @@ class MenuTransferTest extends TestCase
                 ['label' => 'Poison', 'url' => 'https://example.com', 'visibility' => ['auth' => 'yes']],
             ],
         ]);
+    }
+
+    public function test_import_rejects_a_non_boolean_hide_on_current_domain_value(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[items.0.visibility.hide_on_current_domain]');
+
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                [
+                    'label' => 'Poison',
+                    'url' => 'https://example.com',
+                    'visibility' => ['hide_on_current_domain' => 'yes'],
+                ],
+            ],
+        ]);
+    }
+
+    public function test_the_hide_on_current_domain_flag_survives_an_export_import_round_trip(): void
+    {
+        TopbarMenuItem::create([
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $payload = $this->transfer()->export();
+
+        $this->assertSame(
+            ['hide_on_current_domain' => true],
+            $payload['items'][0]['visibility'],
+        );
+
+        TopbarMenuItem::query()->delete();
+
+        $this->transfer()->import($payload);
+
+        $this->assertSame(
+            ['hide_on_current_domain' => true],
+            TopbarMenuItem::query()->sole()->visibility,
+        );
     }
 
     public function test_import_rejects_a_tree_deeper_than_two_levels(): void

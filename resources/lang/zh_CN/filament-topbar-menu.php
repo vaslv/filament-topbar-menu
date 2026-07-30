@@ -62,6 +62,10 @@ return [
                 'guest' => '仅访客',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => '在自身域名下隐藏',
+            'helper' => '当服务的域名与链接域名一致时不显示该菜单项——用于多个服务共享同一菜单。',
+        ],
         'sort' => [
             'label' => '排序',
             'helper' => '数值越小越靠前。也可以在列表中拖动行进行排序。',
@@ -77,6 +81,8 @@ return [
         'target' => '打开方式',
         'is_active' => '启用',
         'sort' => '排序',
+        'hidden_on_current_domain' => '已在此域名下隐藏',
+        'hidden_on_current_domain_tooltip' => '已在此域名下隐藏；在其他服务上仍然可见。',
     ],
 
     'filters' => [

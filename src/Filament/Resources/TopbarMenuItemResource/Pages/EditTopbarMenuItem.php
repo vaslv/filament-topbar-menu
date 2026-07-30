@@ -29,17 +29,24 @@ class EditTopbarMenuItem extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $visibility = $data['visibility'] ?? null;
+        $visibility = is_array($visibility) ? $visibility : null;
 
-        $data['visibility_mode'] = TopbarMenuItem::visibilityModeFromArray(
-            is_array($visibility) ? $visibility : null,
-        );
+        $data['visibility_mode'] = TopbarMenuItem::visibilityModeFromArray($visibility);
+
+        // Always fill from the stored key — route items included (the field is
+        // merely hidden for them). Switching the type to URL in the live form
+        // then reveals the real stored value, never an invented `false`, so
+        // what the admin sees is what a save applies.
+        $data['visibility_hide_on_current_domain'] = (bool) ($visibility['hide_on_current_domain'] ?? false);
 
         return $data;
     }
 
     /**
-     * Map the virtual `visibility_mode` back onto the `visibility` array,
-     * preserving keys the form does not manage (notably `roles`).
+     * Map the virtual fields back onto the `visibility` array, preserving keys
+     * the form does not manage (notably `roles`). The helpers are chained —
+     * the second builds on the first one's result; independent calls over the
+     * original array would clobber each other.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -51,12 +58,19 @@ class EditTopbarMenuItem extends EditRecord
 
         $mode = $data['visibility_mode'] ?? null;
 
-        $data['visibility'] = TopbarMenuItem::applyVisibilityMode(
-            $record->visibility,
-            is_string($mode) ? $mode : null,
+        // The toggle is only offered for URL items. When the submitted type is
+        // route, the hidden toggle must neither erase nor rewrite the stored
+        // key — keep whatever the record already has.
+        $enabled = ($data['type'] ?? null) === TopbarMenuItem::TYPE_URL
+            ? (bool) ($data['visibility_hide_on_current_domain'] ?? false)
+            : (bool) ($record->visibility['hide_on_current_domain'] ?? false);
+
+        $data['visibility'] = TopbarMenuItem::applyHideOnCurrentDomain(
+            TopbarMenuItem::applyVisibilityMode($record->visibility, is_string($mode) ? $mode : null),
+            $enabled,
         );
 
-        unset($data['visibility_mode']);
+        unset($data['visibility_mode'], $data['visibility_hide_on_current_domain']);
 
         return $data;
     }

@@ -62,6 +62,10 @@ return [
                 'guest' => 'Alleen gasten',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Verbergen op eigen domein',
+            'helper' => 'Het item wordt niet getoond op de service waarvan het domein overeenkomt met dat van de link — voor één gedeeld menu over meerdere services.',
+        ],
         'sort' => [
             'label' => 'Volgorde',
             'helper' => 'Lagere waarden worden eerst getoond. Je kunt de rijen in de lijst ook verslepen.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Openen in',
         'is_active' => 'Actief',
         'sort' => 'Volgorde',
+        'hidden_on_current_domain' => 'Verborgen op dit domein',
+        'hidden_on_current_domain_tooltip' => 'Verborgen op dit domein; zichtbaar op de overige services van de vloot.',
     ],
 
     'filters' => [

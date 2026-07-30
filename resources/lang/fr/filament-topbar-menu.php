@@ -62,6 +62,10 @@ return [
                 'guest' => 'Invités uniquement',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Masquer sur son propre domaine',
+            'helper' => 'L\'élément n\'est pas affiché sur le service dont le domaine correspond à celui du lien — pour un menu partagé entre plusieurs services.',
+        ],
         'sort' => [
             'label' => 'Ordre',
             'helper' => 'Les valeurs les plus faibles sont affichées en premier. Vous pouvez aussi glisser-déposer les lignes dans la liste.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Cible',
         'is_active' => 'Actif',
         'sort' => 'Ordre',
+        'hidden_on_current_domain' => 'Masqué sur ce domaine',
+        'hidden_on_current_domain_tooltip' => 'Masqué sur ce domaine ; visible sur les autres services de la flotte.',
     ],
 
     'filters' => [

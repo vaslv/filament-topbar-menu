@@ -4,6 +4,7 @@ namespace Vaslv\FilamentTopbarMenu\Tests;
 
 use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Vaslv\FilamentTopbarMenu\Facades\TopbarMenu;
@@ -226,6 +227,94 @@ class MenuCacheTest extends TestCase
         TopbarMenu::items();
 
         $this->assertSame(0, $retrieved);
+    }
+
+    public function test_the_hide_on_current_domain_flag_works_after_cache_rehydration(): void
+    {
+        TopbarMenuItem::create([
+            'label' => 'Self',
+            'type' => 'url',
+            'url' => 'https://a.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+        TopbarMenuItem::create([
+            'label' => 'Sibling',
+            'type' => 'url',
+            'url' => 'https://b.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        // Prime the cache, then read again so the items come back rehydrated
+        // from the cached snapshot: `visibility` must survive the
+        // getAttributes()/casts round-trip (historically the package's most
+        // fragile path), and the domain check must run per request — never be
+        // baked into the cache.
+        TopbarMenu::items();
+
+        $this->bindRequest('https://a.example.com/admin');
+
+        DB::enableQueryLog();
+        $visible = TopbarMenu::visibleItems(null);
+        DB::disableQueryLog();
+
+        $this->assertCount(0, DB::getQueryLog());
+        $this->assertSame(['Sibling'], $visible->pluck('label')->all());
+
+        // The same cached tree on another host shows the other item.
+        $this->bindRequest('https://b.example.com/admin');
+
+        $this->assertSame(['Self'], TopbarMenu::visibleItems(null)->pluck('label')->all());
+    }
+
+    public function test_enabling_the_flag_flushes_the_cache_and_hides_the_item_end_to_end(): void
+    {
+        $this->bindRequest('https://a.example.com/admin');
+
+        $item = TopbarMenuItem::create([
+            'label' => 'Self',
+            'type' => 'url',
+            'url' => 'https://a.example.com',
+        ]);
+
+        $this->assertSame(['Self'], TopbarMenu::visibleItems(null)->pluck('label')->all());
+        $this->assertTrue(Cache::has(TopbarMenu::cacheKey()));
+
+        // What the admin form's save does under the hood. The saved hook
+        // flushes the cache, so the very next render drops the item — no
+        // stale-TTL window.
+        $item->update([
+            'visibility' => TopbarMenuItem::applyHideOnCurrentDomain($item->visibility, true),
+        ]);
+
+        $this->assertFalse(Cache::has(TopbarMenu::cacheKey()));
+        $this->assertSame([], TopbarMenu::visibleItems(null)->pluck('label')->all());
+    }
+
+    public function test_a_flagged_group_with_its_own_current_host_url_hides_the_whole_subtree(): void
+    {
+        // Deliberate semantics: a "group about this service" is not needed on
+        // this service — the flagged parent is filtered out in visibleItems(),
+        // taking its children with it.
+        $parent = TopbarMenuItem::create([
+            'label' => 'This service',
+            'type' => 'url',
+            'url' => 'https://a.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+        TopbarMenuItem::create([
+            'label' => 'Child',
+            'type' => 'url',
+            'url' => 'https://b.example.com',
+            'parent_id' => $parent->id,
+        ]);
+
+        $this->bindRequest('https://a.example.com/admin');
+
+        $this->assertCount(0, TopbarMenu::visibleItems(null));
+
+        $this->bindRequest('https://b.example.com/admin');
+
+        $this->assertSame(['This service'], TopbarMenu::visibleItems(null)->pluck('label')->all());
     }
 
     public function test_visible_items_respect_visibility_rules(): void

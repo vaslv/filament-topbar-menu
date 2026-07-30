@@ -273,11 +273,20 @@ class MenuTransfer
      */
     protected function isSafeHttpUrl(string $url): bool
     {
-        return in_array(
+        if (! in_array(
             strtolower((string) parse_url($url, PHP_URL_SCHEME)),
             ['http', 'https'],
             true,
-        );
+        )) {
+            return false;
+        }
+
+        // The scheme alone is not enough: `http:foo` parses as scheme+path
+        // with no host, so it would pass a scheme-only check while browsers
+        // read the href differently than PHP does — and the
+        // hide_on_current_domain flag could never match it. A real menu link
+        // always names a host.
+        return filled(parse_url($url, PHP_URL_HOST));
     }
 
     /**
@@ -327,7 +336,8 @@ class MenuTransfer
     /**
      * The visibility array is consumed by TopbarMenuItem::isVisibleTo, which
      * passes `roles` straight to the user model's hasAnyRole(). Enforce the
-     * shape the model expects (auth/guest booleans, roles a list of strings) so
+     * shape the model expects (auth/guest/hide_on_current_domain booleans,
+     * roles a list of strings) so
      * a hand-edited file can never throw a TypeError on every panel request.
      *
      * @throws InvalidArgumentException
@@ -342,7 +352,7 @@ class MenuTransfer
             throw new InvalidArgumentException("[{$path}] must be an object or null.");
         }
 
-        foreach (['auth', 'guest'] as $flag) {
+        foreach (['auth', 'guest', 'hide_on_current_domain'] as $flag) {
             if (isset($value[$flag]) && ! is_bool($value[$flag])) {
                 throw new InvalidArgumentException("[{$path}.{$flag}] must be a boolean.");
             }

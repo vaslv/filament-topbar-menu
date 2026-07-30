@@ -247,6 +247,19 @@ class TopbarMenuItemResource extends Resource
                             ->nullable()
                             ->helperText(static::trans('fields.visibility.helper')),
 
+                        // Same virtual-field workaround as `visibility_mode`
+                        // above: the toggle maps from and back onto the
+                        // `visibility` JSON array in the Create/Edit pages.
+                        // URL items only — the rule never applies to route
+                        // items, so the toggle is not offered for them; a
+                        // stored value survives the type switch untouched
+                        // (see EditTopbarMenuItem::mutateFormDataBeforeSave).
+                        Toggle::make('visibility_hide_on_current_domain')
+                            ->label(static::trans('fields.hide_on_current_domain.label'))
+                            ->helperText(static::trans('fields.hide_on_current_domain.helper'))
+                            ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
+                            ->inline(false),
+
                         TextInput::make('sort')
                             ->label(static::trans('fields.sort.label'))
                             ->numeric()
@@ -291,6 +304,22 @@ class TopbarMenuItemResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => static::trans("fields.type.options.{$state}"))
                     ->color(fn (string $state): string => $state === TopbarMenuItem::TYPE_ROUTE ? 'info' : 'gray'),
+
+                // Trust marker for the fleet scenario: flipping the domain
+                // toggle makes the item vanish from this very admin's topbar,
+                // which reads as a deletion without this badge. State comes
+                // from the same isHiddenOnCurrentDomain() the render path
+                // uses, so the badge and the menu never disagree. Empty for
+                // most rows on purpose — no loud header needed.
+                IconColumn::make('hidden_on_current_domain')
+                    ->label(static::trans('columns.hidden_on_current_domain'))
+                    ->state(fn (TopbarMenuItem $record): bool => $record->isHiddenOnCurrentDomain())
+                    ->icon(fn (bool $state): ?string => $state ? 'heroicon-o-eye-slash' : null)
+                    ->color('gray')
+                    ->tooltip(fn (?bool $state): ?string => $state
+                        ? static::trans('columns.hidden_on_current_domain_tooltip')
+                        : null)
+                    ->toggleable(),
 
                 TextColumn::make('target')
                     ->label(static::trans('columns.target'))

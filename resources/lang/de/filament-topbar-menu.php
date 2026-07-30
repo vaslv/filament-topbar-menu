@@ -62,6 +62,10 @@ return [
                 'guest' => 'Nur Gäste',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Auf eigener Domain ausblenden',
+            'helper' => 'Der Eintrag wird auf dem Dienst nicht angezeigt, dessen Domain mit der des Links übereinstimmt — für ein gemeinsames Menü mehrerer Dienste.',
+        ],
         'sort' => [
             'label' => 'Sortierung',
             'helper' => 'Kleinere Werte werden zuerst angezeigt. Zeilen lassen sich in der Liste auch per Drag & Drop sortieren.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Ziel',
         'is_active' => 'Aktiv',
         'sort' => 'Sortierung',
+        'hidden_on_current_domain' => 'Auf dieser Domain ausgeblendet',
+        'hidden_on_current_domain_tooltip' => 'Auf dieser Domain ausgeblendet; auf den übrigen Diensten der Flotte sichtbar.',
     ],
 
     'filters' => [

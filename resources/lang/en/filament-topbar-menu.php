@@ -62,6 +62,10 @@ return [
                 'guest' => 'Guests only',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Hide on its own domain',
+            'helper' => 'The item is not shown on the service whose domain matches the link — for one menu shared across several services.',
+        ],
         'sort' => [
             'label' => 'Sort',
             'helper' => 'Lower values are shown first. You can also drag rows in the list.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Target',
         'is_active' => 'Active',
         'sort' => 'Sort',
+        'hidden_on_current_domain' => 'Hidden on this domain',
+        'hidden_on_current_domain_tooltip' => 'Hidden on this domain; still visible on the fleet\'s other services.',
     ],
 
     'filters' => [

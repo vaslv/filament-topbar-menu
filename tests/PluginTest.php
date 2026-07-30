@@ -20,7 +20,9 @@ use Filament\Tables\Table;
 use Filament\Tables\TablesServiceProvider;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\WidgetsServiceProvider;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 use ReflectionMethod;
 use ReflectionProperty;
@@ -217,6 +219,65 @@ class PluginTest extends TestCase
         $this->assertNull($column->record($withUrlIcon)->getIcon($withUrlIcon->icon));
     }
 
+    public function test_the_table_badge_marks_items_hidden_on_the_current_domain(): void
+    {
+        $this->bindRequest('https://a.example.com/admin');
+
+        $livewire = new class extends Component implements HasActions, HasSchemas, HasTable
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+            use InteractsWithTable;
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $table = TopbarMenuItemResource::table(Table::make($livewire));
+
+        // getState() resolves through the host component's table property,
+        // which InteractsWithTable only initializes during a real Livewire
+        // boot — wire it up by hand for this standalone table.
+        $tableProperty = new ReflectionProperty($livewire, 'table');
+        $tableProperty->setValue($livewire, $table);
+
+        $column = $table->getColumn('hidden_on_current_domain');
+
+        $this->assertNotNull($column);
+
+        $ownLink = TopbarMenuItem::create([
+            'label' => 'This service',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com/home',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $foreignLink = TopbarMenuItem::create([
+            'label' => 'Sibling service',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://b.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $unflagged = TopbarMenuItem::create([
+            'label' => 'Plain',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com/other',
+        ]);
+
+        // The badge shows exactly for items the flag hides on THIS host — the
+        // same isHiddenOnCurrentDomain() the render path uses.
+        $this->assertSame('heroicon-o-eye-slash', $column->record($ownLink)->getIcon(true));
+        $this->assertTrue($column->record($ownLink)->getState());
+        $this->assertFalse($column->record($foreignLink)->getState());
+        $this->assertFalse($column->record($unflagged)->getState());
+
+        // No icon at all for a non-hidden row (an empty cell, not a crossed eye).
+        $this->assertNull($column->record($foreignLink)->getIcon(false));
+    }
+
     public function test_the_menu_view_renders_items_dropdowns_and_favicons(): void
     {
         $parent = TopbarMenuItem::create([
@@ -281,6 +342,69 @@ class PluginTest extends TestCase
 
         // Heroicons render as inline SVG through the Filament icon component.
         $this->assertStringContainsString('<svg', $html);
+    }
+
+    public function test_groups_whose_children_are_hidden_by_the_flag_collapse_per_host(): void
+    {
+        // A group WITHOUT its own URL disappears entirely once the flag hides
+        // all its children; a group WITH its own URL degrades to a flat link —
+        // both are the view's existing empty-children behavior, now with a
+        // host-dependent trigger.
+        $bare = TopbarMenuItem::create([
+            'label' => 'Bare group',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => null,
+        ]);
+        TopbarMenuItem::create([
+            'label' => 'Bare child',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com/tools',
+            'parent_id' => $bare->id,
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $linked = TopbarMenuItem::create([
+            'label' => 'Linked group',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://portal.example.com',
+        ]);
+        TopbarMenuItem::create([
+            'label' => 'Linked child',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com/reports',
+            'parent_id' => $linked->id,
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        // On the children's own host: no dropdowns at all — the bare group is
+        // gone, the linked group renders as a plain link to its own URL.
+        $this->bindRequest('https://a.example.com/admin');
+
+        $html = view('filament-topbar-menu::menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertStringNotContainsString('Bare group', $html);
+        $this->assertStringNotContainsString('Bare child', $html);
+        $this->assertStringNotContainsString('Linked child', $html);
+        $this->assertStringContainsString('Linked group', $html);
+        $this->assertStringContainsString('href="https://portal.example.com"', $html);
+        $this->assertStringNotContainsString('fi-dropdown-list-item', $html);
+
+        // On a sibling host the same cached tree renders both dropdowns.
+        $this->bindRequest('https://b.example.com/admin');
+
+        $html = view('filament-topbar-menu::menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertStringContainsString('Bare group', $html);
+        $this->assertStringContainsString('href="https://a.example.com/tools"', $html);
+        $this->assertStringContainsString('Linked group', $html);
+        $this->assertStringContainsString('href="https://a.example.com/reports"', $html);
+        $this->assertStringContainsString('fi-dropdown-list-item', $html);
     }
 
     public function test_the_menu_view_renders_nothing_when_there_are_no_items(): void
@@ -390,5 +514,206 @@ class PluginTest extends TestCase
         $public = $createMutator->invoke(new Pages\CreateTopbarMenuItem, ['label' => 'New', 'visibility_mode' => null]);
 
         $this->assertNull($public['visibility']);
+    }
+
+    public function test_creating_a_url_item_with_the_hide_on_current_domain_toggle_stores_the_key(): void
+    {
+        $createMutator = new ReflectionMethod(new Pages\CreateTopbarMenuItem, 'mutateFormDataBeforeCreate');
+
+        /** @var array<string, mixed> $created */
+        $created = $createMutator->invoke(new Pages\CreateTopbarMenuItem, [
+            'label' => 'Sibling service',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'visibility_mode' => null,
+            'visibility_hide_on_current_domain' => true,
+        ]);
+
+        $this->assertSame(['hide_on_current_domain' => true], $created['visibility']);
+        $this->assertArrayNotHasKey('visibility_hide_on_current_domain', $created);
+
+        // A route item never stores the key, whatever the (hidden) toggle held.
+        /** @var array<string, mixed> $routeItem */
+        $routeItem = $createMutator->invoke(new Pages\CreateTopbarMenuItem, [
+            'label' => 'Dashboard',
+            'type' => TopbarMenuItem::TYPE_ROUTE,
+            'visibility_mode' => null,
+            'visibility_hide_on_current_domain' => true,
+        ]);
+
+        $this->assertNull($routeItem['visibility']);
+    }
+
+    public function test_switching_a_url_item_to_route_keeps_the_stored_hide_on_current_domain_key(): void
+    {
+        $item = TopbarMenuItem::create([
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $page = new Pages\EditTopbarMenuItem;
+        $page->record = $item;
+
+        $saveMutator = new ReflectionMethod($page, 'mutateFormDataBeforeSave');
+
+        // The toggle is hidden for route items — its (absent) state must keep
+        // the stored key, not erase it.
+        /** @var array<string, mixed> $data */
+        $data = $saveMutator->invoke($page, [
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_ROUTE,
+            'visibility_mode' => null,
+        ]);
+
+        $this->assertSame(['hide_on_current_domain' => true], $data['visibility']);
+    }
+
+    public function test_switching_a_route_item_to_url_fills_the_toggle_with_the_stored_value_and_saves_what_the_admin_saw(): void
+    {
+        // A route item can carry the key via seeder/import; the fill must show
+        // the real stored value once the type is switched to URL in the form.
+        $item = TopbarMenuItem::create([
+            'label' => 'Dashboard',
+            'type' => TopbarMenuItem::TYPE_ROUTE,
+            'route' => 'dashboard',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $page = new Pages\EditTopbarMenuItem;
+        $page->record = $item;
+
+        $fillMutator = new ReflectionMethod($page, 'mutateFormDataBeforeFill');
+
+        /** @var array<string, mixed> $filled */
+        $filled = $fillMutator->invoke($page, $item->attributesToArray());
+
+        $this->assertTrue($filled['visibility_hide_on_current_domain']);
+
+        // Saving as a URL item honestly applies what the admin saw — here they
+        // switched the visible toggle off.
+        $saveMutator = new ReflectionMethod($page, 'mutateFormDataBeforeSave');
+
+        /** @var array<string, mixed> $data */
+        $data = $saveMutator->invoke($page, [
+            'label' => 'Dashboard',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com',
+            'visibility_mode' => null,
+            'visibility_hide_on_current_domain' => false,
+        ]);
+
+        $this->assertNull($data['visibility']);
+    }
+
+    public function test_a_combined_submit_of_visibility_mode_and_the_domain_toggle_keeps_both_keys(): void
+    {
+        $item = TopbarMenuItem::create([
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com',
+            'visibility' => ['roles' => ['admin']],
+        ]);
+
+        $page = new Pages\EditTopbarMenuItem;
+        $page->record = $item;
+
+        $saveMutator = new ReflectionMethod($page, 'mutateFormDataBeforeSave');
+
+        // Both virtual fields change in one submit: the helpers are chained,
+        // so neither result clobbers the other — and roles survive too.
+        /** @var array<string, mixed> $data */
+        $data = $saveMutator->invoke($page, [
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'visibility_mode' => 'auth',
+            'visibility_hide_on_current_domain' => true,
+        ]);
+
+        $this->assertSame(
+            ['roles' => ['admin'], 'auth' => true, 'hide_on_current_domain' => true],
+            $data['visibility'],
+        );
+    }
+
+    public function test_the_forms_url_rule_rejects_the_defensive_branch_values(): void
+    {
+        // Premise fixed in code: pointsAtCurrentHost()'s no-host branches
+        // (relative URLs, mailto:/tel:) are defensive-only because the form's
+        // ->url() field runs Laravel's `url` rule, which requires `://` — such
+        // values never reach the column through the form. (The import
+        // additionally allows http(s) with a host only; see MenuTransferTest.)
+        //
+        // First pin that the actual form field carries the rule — otherwise
+        // the assertions below would keep passing even if ->url() were
+        // dropped from the resource.
+        $livewire = new class extends Component implements HasActions, HasSchemas
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+
+            /** @var array<string, mixed> */
+            public ?array $data = [];
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $schema = TopbarMenuItemResource::form(
+            Schema::make($livewire)->statePath('data')->model(TopbarMenuItem::class),
+        );
+
+        $urlField = collect($schema->getFlatComponents(withHidden: true))
+            ->first(fn ($component): bool => method_exists($component, 'getName')
+                && $component->getName() === 'url');
+
+        $this->assertNotNull($urlField, 'The url field is missing from the form.');
+        $this->assertContains('url', $urlField->getValidationRules());
+
+        foreach (['/dashboard', 'mailto:team@example.com', 'tel:+123456789'] as $value) {
+            $this->assertTrue(
+                Validator::make(['url' => $value], ['url' => 'url'])->fails(),
+                "Expected [{$value}] to fail the url rule",
+            );
+        }
+
+        $this->assertFalse(
+            Validator::make(['url' => 'https://a.example.com'], ['url' => 'url'])->fails(),
+        );
+    }
+
+    public function test_the_hide_on_current_domain_toggle_is_only_offered_for_url_items(): void
+    {
+        $livewire = new class extends Component implements HasActions, HasSchemas
+        {
+            use InteractsWithActions;
+            use InteractsWithSchemas;
+
+            /** @var array<string, mixed> */
+            public ?array $data = [];
+
+            public function render(): string
+            {
+                return '';
+            }
+        };
+
+        $schema = TopbarMenuItemResource::form(
+            Schema::make($livewire)->statePath('data')->model(TopbarMenuItem::class),
+        );
+
+        $toggle = collect($schema->getFlatComponents(withHidden: true))
+            ->first(fn ($component): bool => method_exists($component, 'getName')
+                && $component->getName() === 'visibility_hide_on_current_domain');
+
+        $this->assertNotNull($toggle, 'The hide-on-current-domain toggle is missing from the form.');
+
+        $schema->fill(['type' => TopbarMenuItem::TYPE_URL]);
+        $this->assertTrue($toggle->isVisible());
+
+        $schema->fill(['type' => TopbarMenuItem::TYPE_ROUTE]);
+        $this->assertFalse($toggle->isVisible());
     }
 }

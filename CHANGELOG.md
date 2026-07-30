@@ -5,6 +5,41 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0]
+
+### Added
+
+- **"Hide on its own domain" option for menu items.** A per-item toggle (the
+  `hide_on_current_domain` key in the `visibility` JSON column — no migration,
+  fleet-safe) that hides a URL item on the service whose host matches the
+  item's URL. One fleet-shared menu can now list every service while each app
+  automatically renders "everyone but me". Host matching is case-insensitive,
+  ignores `www.` and a trailing dot, treats subdomains as significant, equates
+  the default ports 80/443 with an absent port (a non-standard port stays
+  significant, so `localhost:8000` ≠ `localhost:8001`), does not compare the
+  scheme, aligns punycode/unicode spellings via `ext-intl` when installed
+  (non-transitional UTS #46, the way browsers resolve hosts), and
+  canonicalizes IPv6 literals (`[2001:db8::1]` ≡ `[2001:0db8::0:1]`).
+  The rule applies to URL items only — Laravel route items ignore the key.
+  Visibility is still evaluated per request, never baked into the cache.
+- **"Hidden on this domain" badge in the admin table.** Items the flag hides
+  on the current host show a crossed-eye icon with a tooltip, so a vanished
+  topbar entry reads as "hidden here, visible on the rest of the fleet" — not
+  as a deletion.
+- Import validation for the new key (booleans only), matching the existing
+  visibility guarantees; the flag survives export/import round-trips.
+- Translations of the new toggle, helper and badge for all 13 shipped locales,
+  and a README section on fleet menus, including host-matching semantics and
+  a note on trusted proxies / `X-Forwarded-Host` behind reverse proxies.
+
+### Changed
+
+- Import URL validation now also requires a host: a scheme-only value like
+  `http:foo` used to pass the http(s) check while browsers read such an href
+  differently than PHP parses it — and the new domain flag could never match
+  it. Real menu links always name a host; files with hostless URLs are now
+  rejected up front like other malformed values.
+
 ## [1.7.0]
 
 ### Added

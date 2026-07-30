@@ -187,11 +187,13 @@ TopbarMenuItem::create([
 The `visibility` JSON column supports:
 
 ```php
-['auth' => true]              // authenticated users only
-['guest' => true]             // guests only
-['roles' => ['admin', 'ops']] // users with any of these roles
-                              // (requires a hasAnyRole() method on your user model,
-                              //  e.g. from spatie/laravel-permission)
+['auth' => true]                    // authenticated users only
+['guest' => true]                   // guests only
+['roles' => ['admin', 'ops']]       // users with any of these roles
+                                    // (requires a hasAnyRole() method on your user model,
+                                    //  e.g. from spatie/laravel-permission)
+['hide_on_current_domain' => true]  // hide the item on the service its URL points at
+                                    // (URL items only — see "Hiding each service's own link")
 ```
 
 Visibility is evaluated per request — it is never baked into the cache.
@@ -351,6 +353,69 @@ The old table stays behind on the previous connection — drop it manually once
 you have verified the move. For moves the copy flag does not cover (e.g.
 seeding an already-populated shared menu), use the Export/Import actions on
 the menu items page.
+
+### Hiding each service's own link
+
+A fleet-shared menu usually lists every service of the fleet — including the
+one currently being viewed. Enable **"Hide on its own domain"** on a menu item
+(or set `visibility.hide_on_current_domain` to `true`) and the item disappears
+on the service whose host matches the item's URL, while every other service
+keeps showing it. Add a service to the menu once and each app automatically
+renders "everyone but me" — no per-app menus, no self-links.
+
+The rule applies to **URL items only**. Laravel route items always render;
+the key is ignored on them (a route by definition lives on the current app,
+hiding it would be a different feature). The admin table marks items the flag
+hides on the current host with a crossed-eye badge — the item is hidden here,
+not deleted, and stays visible on the fleet's other services.
+
+Host matching compares service identity, not URLs:
+
+- Case-insensitive; a trailing dot and a `www.` prefix are ignored on both
+  sides (`www.a.example.com` ≡ `a.example.com`).
+- Subdomains are significant: `a.example.com` ≠ `b.example.com`.
+- The scheme is not compared (`http://` ≡ `https://`), and the default ports
+  80/443 equal an absent port. A **non-standard** port is part of the
+  identity, so a dev fleet on `localhost:8000` / `localhost:8001` works.
+- Punycode and unicode spellings of one domain match (via `ext-intl`, when
+  installed).
+
+A seeder example for a fleet of three services:
+
+```php
+foreach ([
+    'Accounts'  => 'https://accounts.example.com',
+    'Billing'   => 'https://billing.example.com',
+    'Analytics' => 'https://analytics.example.com',
+] as $label => $url) {
+    TopbarMenuItem::create([
+        'label' => $label,
+        'type' => TopbarMenuItem::TYPE_URL,
+        'url' => $url,
+        'visibility' => ['hide_on_current_domain' => true],
+    ]);
+}
+```
+
+Older package versions on other apps in the fleet simply ignore the unknown
+key, so the flag can be rolled out without synchronized upgrades.
+
+#### Behind a reverse proxy
+
+The current host comes from Laravel's `request()->getHost()` (and, for
+non-standard ports, `request()->getPort()`). Behind a reverse proxy or load
+balancer (nginx, Traefik, …) that is only correct when trusted proxies are
+configured and the proxy forwards `X-Forwarded-Host` — plus `X-Forwarded-Port`
+(or `X-Forwarded-Proto`) when the fleet runs on non-standard ports — otherwise
+Laravel sees the internal container host/port and the flag silently never
+matches.
+This is the consuming app's configuration (see the
+[Laravel docs on trusted proxies](https://laravel.com/docs/requests#configuring-trusted-proxies)),
+not the package's.
+
+Note that a spoofed `Host` header only changes which menu items appear in the
+response served to the spoofing client itself — the flag is a display rule,
+not a security boundary, and grants no access either way.
 
 ### Operating notes for a shared menu
 

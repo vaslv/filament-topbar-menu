@@ -169,7 +169,7 @@ class TopbarMenuItemTest extends TestCase
 
     public function test_is_active_matches_the_current_url(): void
     {
-        $this->app->instance('request', Request::create('https://myapp.test/dashboard'));
+        $this->bindRequest('https://myapp.test/dashboard');
 
         $active = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard']);
         $trailingSlash = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard/']);
@@ -184,7 +184,7 @@ class TopbarMenuItemTest extends TestCase
 
     public function test_a_group_is_active_when_one_of_its_children_is_active(): void
     {
-        $this->app->instance('request', Request::create('https://myapp.test/reports'));
+        $this->bindRequest('https://myapp.test/reports');
 
         $parent = TopbarMenuItem::create(['label' => 'Group', 'type' => 'url', 'url' => 'https://myapp.test/overview']);
         TopbarMenuItem::create(['label' => 'Reports', 'type' => 'url', 'url' => 'https://myapp.test/reports', 'parent_id' => $parent->id]);
@@ -237,6 +237,246 @@ class TopbarMenuItemTest extends TestCase
 
         $this->assertTrue($rolesOnly->isVisibleTo($admin));
         $this->assertFalse($rolesOnly->isVisibleTo($editor));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $visibility
+     */
+    private function urlItem(?string $url, ?array $visibility = ['hide_on_current_domain' => true]): TopbarMenuItem
+    {
+        return new TopbarMenuItem([
+            'label' => 'Item',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => $url,
+            'visibility' => $visibility,
+        ]);
+    }
+
+    public function test_hide_on_current_domain_matches_hosts_by_normalized_identity(): void
+    {
+        $this->bindRequest('https://a.example.com/admin');
+
+        // Hosts identifying the current service: case, www., default ports,
+        // scheme and a trailing dot never matter.
+        foreach ([
+            'https://a.example.com/some/path',
+            'https://www.a.example.com',
+            'HTTPS://A.EXAMPLE.COM',
+            'https://a.example.com:443/x',
+            'http://a.example.com',
+            'https://a.example.com./x',
+        ] as $url) {
+            $this->assertFalse($this->urlItem($url)->isVisibleTo(null), "Expected {$url} to be hidden on a.example.com");
+        }
+
+        // Different services: subdomains are significant.
+        foreach ([
+            'https://b.example.com',
+            'https://example.com',
+            'https://a.example.org',
+        ] as $url) {
+            $this->assertTrue($this->urlItem($url)->isVisibleTo(null), "Expected {$url} to stay visible on a.example.com");
+        }
+    }
+
+    public function test_hide_on_current_domain_strips_www_from_the_request_side_too(): void
+    {
+        $this->bindRequest('https://www.a.example.com/admin');
+
+        $this->assertFalse($this->urlItem('https://a.example.com')->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_treats_non_standard_ports_as_significant(): void
+    {
+        // A dev fleet on ports of one localhost: each service hides only its
+        // own port, not every flagged item.
+        $this->bindRequest('http://localhost:8000/admin');
+
+        $this->assertFalse($this->urlItem('http://localhost:8000/dashboard')->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('http://localhost:8001')->isVisibleTo(null));
+
+        // A non-standard item port never matches a default request port…
+        $this->bindRequest('https://a.example.com/admin');
+
+        $this->assertTrue($this->urlItem('https://a.example.com:8443')->isVisibleTo(null));
+
+        // …and the mirror case: a request served on a non-standard port never
+        // matches an item URL without one (request-side port normalization).
+        $this->bindRequest('https://a.example.com:8443/admin');
+
+        $this->assertTrue($this->urlItem('https://a.example.com')->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_is_ignored_on_route_items(): void
+    {
+        Route::get('/dashboard', fn () => 'ok')->name('dashboard');
+
+        $this->bindRequest('https://myapp.test/admin');
+
+        // The key can only land on a route item via a seeder or import; the
+        // rule is for external links only, so it is ignored — the item stays
+        // visible even though route() generates a current-host URL.
+        $item = new TopbarMenuItem([
+            'label' => 'Dashboard',
+            'type' => TopbarMenuItem::TYPE_ROUTE,
+            'route' => 'dashboard',
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $this->assertFalse($item->pointsAtCurrentHost());
+        $this->assertTrue($item->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_defensive_branches_for_hostless_and_malformed_urls(): void
+    {
+        // These values cannot be stored through the form (`->url()` requires
+        // `://`) or the import (http(s) only) — only via a seeder or manual
+        // SQL. The check must still behave deterministically for them.
+        $this->bindRequest('https://a.example.com/admin');
+
+        // A relative URL is, by definition, the current domain.
+        $this->assertFalse($this->urlItem('/dashboard')->isVisibleTo(null));
+
+        // A scheme without a host is not "the current domain" — never hidden.
+        $this->assertTrue($this->urlItem('mailto:team@a.example.com')->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('tel:+123456789')->isVisibleTo(null));
+
+        // parse_url() === false: an undeterminable domain is not a match.
+        $this->assertTrue($this->urlItem('http:///path')->isVisibleTo(null));
+
+        // A URL-less dropdown group: nothing to compare, the flag is inert.
+        $this->assertTrue($this->urlItem(null)->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_aligns_punycode_and_unicode_spellings(): void
+    {
+        if (! function_exists('idn_to_ascii')) {
+            $this->markTestSkipped('ext-intl is not installed.');
+        }
+
+        $this->bindRequest('https://xn--e1afmkfd.xn--p1ai/admin');
+
+        $this->assertFalse($this->urlItem('https://пример.рф')->isVisibleTo(null));
+
+        // Mixed-case unicode relies on UTS #46 case folding inside
+        // idn_to_ascii (byte-wise strtolower does not touch multibyte chars).
+        $this->assertFalse($this->urlItem('https://Пример.рф')->isVisibleTo(null));
+
+        // Deviation characters (ß) must keep their punycode identity —
+        // non-transitional processing, the way browsers resolve the host. A
+        // transitional ICU would fold faß.de to fass.de and miss.
+        $this->bindRequest('https://xn--fa-hia.de/admin');
+
+        $this->assertFalse($this->urlItem('https://faß.de')->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('https://fass.de')->isVisibleTo(null));
+    }
+
+    public function test_an_unconvertible_idn_host_is_compared_as_is(): void
+    {
+        // A DNS label longer than 63 chars makes idn_to_ascii return false —
+        // the fail-open branch must compare the raw host instead of hiding
+        // the item or breaking the visibility check.
+        $long = str_repeat('a', 64);
+
+        $this->bindRequest('https://a.example.com/admin');
+
+        $this->assertTrue($this->urlItem("https://{$long}.example.com")->isVisibleTo(null));
+
+        $this->bindRequest("https://{$long}.example.com/admin");
+
+        $this->assertFalse($this->urlItem("https://{$long}.example.com")->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_canonicalizes_ipv6_literals(): void
+    {
+        // One address, two spellings: zero-compressed and fully expanded
+        // literals must identify the same service; a different address on the
+        // same port must not.
+        $this->bindRequest('http://[2001:db8::1]:8000/admin');
+
+        $this->assertFalse($this->urlItem('http://[2001:0db8:0:0:0:0:0:1]:8000/x')->isVisibleTo(null));
+        $this->assertFalse($this->urlItem('http://[2001:db8::1]:8000')->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('http://[2001:db8::2]:8000')->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_wins_over_a_matching_role(): void
+    {
+        $this->bindRequest('https://a.example.com/admin');
+
+        $item = $this->urlItem('https://a.example.com', [
+            'roles' => ['admin'],
+            'hide_on_current_domain' => true,
+        ]);
+
+        $admin = new class implements Authenticatable
+        {
+            use AuthenticatableTrait;
+
+            /** @param  array<int, string>  $roles */
+            public function hasAnyRole(array $roles): bool
+            {
+                return true;
+            }
+        };
+
+        // The domain check runs BEFORE the roles branch (which ends in an
+        // early return): even a user with a matching role must not see the
+        // item on its own host…
+        $this->assertFalse($item->isVisibleTo($admin));
+
+        // …while on a foreign host the roles branch takes over again.
+        $this->bindRequest('https://b.example.com/admin');
+
+        $this->assertTrue($item->isVisibleTo($admin));
+    }
+
+    public function test_items_without_the_flag_ignore_the_current_host(): void
+    {
+        $this->bindRequest('https://a.example.com/admin');
+
+        $this->assertTrue($this->urlItem('https://a.example.com', null)->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('https://a.example.com', ['hide_on_current_domain' => false])->isVisibleTo(null));
+    }
+
+    public function test_hide_on_current_domain_stays_deterministic_in_console_context(): void
+    {
+        // Outside HTTP, Laravel's SetRequestForConsole bootstrap builds the
+        // request from app.url, so the check stays deterministic without a
+        // real request. No request is bound here on purpose. (In this suite
+        // the console request carries the skeleton's default host, localhost:
+        // Testbench creates it before defineEnvironment overrides app.url.)
+        $consoleHost = request()->getHost();
+
+        $this->assertFalse($this->urlItem("http://{$consoleHost}/status")->isVisibleTo(null));
+        $this->assertTrue($this->urlItem('https://other.test')->isVisibleTo(null));
+    }
+
+    public function test_apply_hide_on_current_domain_preserves_foreign_keys(): void
+    {
+        // Enabling adds only its own key.
+        $this->assertSame(
+            ['roles' => ['admin'], 'hide_on_current_domain' => true],
+            TopbarMenuItem::applyHideOnCurrentDomain(['roles' => ['admin']], true),
+        );
+
+        // Disabling removes only its own key.
+        $this->assertSame(
+            ['auth' => true],
+            TopbarMenuItem::applyHideOnCurrentDomain(['auth' => true, 'hide_on_current_domain' => true], false),
+        );
+
+        // An empty result collapses to null (column stays empty).
+        $this->assertNull(TopbarMenuItem::applyHideOnCurrentDomain(['hide_on_current_domain' => true], false));
+        $this->assertNull(TopbarMenuItem::applyHideOnCurrentDomain(null, false));
+
+        // Chained over applyVisibilityMode: both keys survive one submit.
+        $this->assertSame(
+            ['hide_on_current_domain' => true, 'auth' => true],
+            TopbarMenuItem::applyHideOnCurrentDomain(
+                TopbarMenuItem::applyVisibilityMode(['hide_on_current_domain' => true], 'auth'),
+                true,
+            ),
+        );
     }
 
     public function test_display_icon_prefers_the_favicon_and_validates_the_icon_name(): void

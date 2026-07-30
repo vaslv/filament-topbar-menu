@@ -62,6 +62,10 @@ return [
                 'guest' => 'Yalnızca ziyaretçiler',
             ],
         ],
+        'hide_on_current_domain' => [
+            'label' => 'Kendi alan adında gizle',
+            'helper' => 'Öğe, alan adı bağlantının alan adıyla eşleşen serviste gösterilmez — birden çok servisin ortak menüsü için.',
+        ],
         'sort' => [
             'label' => 'Sıralama',
             'helper' => 'Daha küçük değerler önce gösterilir. Listede satırları sürükleyerek de sıralayabilirsiniz.',
@@ -77,6 +81,8 @@ return [
         'target' => 'Açılacağı yer',
         'is_active' => 'Etkin',
         'sort' => 'Sıralama',
+        'hidden_on_current_domain' => 'Bu alan adında gizli',
+        'hidden_on_current_domain_tooltip' => 'Bu alan adında gizli; filonun diğer servislerinde görünür.',
     ],
 
     'filters' => [

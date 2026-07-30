@@ -236,6 +236,26 @@ class TopbarMenuItem extends Model
      * - `roles` (array) — only show to users with any of the given roles
      *                     (requires a `hasAnyRole()` method on the user model,
      *                     e.g. from spatie/laravel-permission)
+     * - `hide_on_current_domain` (bool) — hide the item when its URL points at
+     *                     the host serving the current request. Lets one shared
+     *                     menu database serve a fleet of apps where each app
+     *                     hides its own link. URL items only; the key is
+     *                     ignored on route items (see pointsAtCurrentHost()).
+     *
+     * Decision tree (keep in sync when editing this method):
+     *
+     *   isVisibleTo(user):
+     *     visibility empty? ──────────→ SHOW
+     *     auth=true and guest? ───────→ HIDE
+     *     guest=true and logged in? ──→ HIDE
+     *     hide_on_current_domain
+     *       and pointsAtCurrentHost()?→ HIDE   ← strictly BEFORE roles: the
+     *                                            roles branch ends in an early
+     *                                            return, so a later check would
+     *                                            be unreachable for role-
+     *                                            restricted items
+     *     roles set? ─→ hasAnyRole ───→ RESULT (early return)
+     *     otherwise ──────────────────→ SHOW
      */
     public function isVisibleTo(?Authenticatable $user): bool
     {
@@ -250,6 +270,10 @@ class TopbarMenuItem extends Model
         }
 
         if (($visibility['guest'] ?? false) && $user !== null) {
+            return false;
+        }
+
+        if ($this->isHiddenOnCurrentDomain()) {
             return false;
         }
 
@@ -278,6 +302,123 @@ class TopbarMenuItem extends Model
         return $this->activeChildren
             ->filter(fn (self $child): bool => $child->isVisibleTo($user))
             ->values();
+    }
+
+    /**
+     * Whether the item is hidden on the host serving the current request: the
+     * `hide_on_current_domain` visibility flag is set AND the item's URL points
+     * at that host. Shared by isVisibleTo() and the admin table's
+     * "hidden on this domain" badge so the two never disagree.
+     */
+    public function isHiddenOnCurrentDomain(): bool
+    {
+        return (bool) ($this->visibility['hide_on_current_domain'] ?? false)
+            && $this->pointsAtCurrentHost();
+    }
+
+    /**
+     * Whether the item's URL points at the host serving the current request.
+     *
+     * Decision tree (keep in sync when editing this method):
+     *
+     *   pointsAtCurrentHost():
+     *     type = route? ─────────────→ false (the rule is for external links
+     *                                         only — never route items)
+     *     resolveUrl() blank? ───────→ false (nothing to compare; a URL-less
+     *                                         dropdown group still renders)
+     *     parse_url() === false? ────→ false (an undeterminable domain is not
+     *                                         a match — show, don't hide)
+     *     has a host? ───────────────→ normalizeHost(item) == normalizeHost(request)
+     *     no host, no scheme? ───────→ true  (a relative URL is, by
+     *                                         definition, the current domain)
+     *     no host, has a scheme? ────→ false (mailto:/tel: — not a domain)
+     *
+     * The no-host branches are defensive only: the form (`->url()` requires
+     * `://`) and the import (http(s) URLs with a host only) never store such
+     * values, so they can only arrive via a seeder or manual SQL.
+     *
+     * Outside an HTTP context (artisan, queues) the request host falls back to
+     * the app's configured URL, so the comparison stays deterministic.
+     */
+    public function pointsAtCurrentHost(): bool
+    {
+        // An explicit type guard, not a side effect of route() generating
+        // current-host URLs: hiding a route item must never happen, even when
+        // the key was planted on one through a seeder or import.
+        if ($this->type === self::TYPE_ROUTE) {
+            return false;
+        }
+
+        $url = $this->resolveUrl();
+
+        if (blank($url)) {
+            return false;
+        }
+
+        $parts = parse_url((string) $url);
+
+        if ($parts === false) {
+            return false;
+        }
+
+        $host = $parts['host'] ?? null;
+
+        if ($host !== null) {
+            $request = request();
+
+            return static::normalizeHost($host, $parts['port'] ?? null)
+                === static::normalizeHost($request->getHost(), (int) $request->getPort() ?: null);
+        }
+
+        return ! isset($parts['scheme']);
+    }
+
+    /**
+     * Normalize a host for the current-domain comparison: hosts differing only
+     * in case, a trailing dot, a `www.` prefix, punycode vs unicode spelling,
+     * or IPv6 zero-compression identify the same service. Subdomains stay
+     * significant. The port is part of the identity only when it is
+     * non-standard — 80/443 and an absent port are equivalent, while
+     * localhost:8000 and localhost:8001 are two different services (a dev
+     * fleet on ports of one host must not all hide).
+     */
+    protected static function normalizeHost(string $host, ?int $port): string
+    {
+        $host = rtrim(strtolower($host), '.');
+
+        // An IPv6 literal (bracketed by parse_url and Request::getHost alike)
+        // spells one address many ways — `[::1]` vs `[0:0:0:0:0:0:0:1]` — so
+        // canonicalize through the binary form. A colon never appears in a
+        // DNS name, so this branch and the name logic below are disjoint.
+        $bare = trim($host, '[]');
+
+        if (str_contains($bare, ':') && filter_var($bare, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $host = '['.inet_ntop((string) inet_pton($bare)).']';
+        } else {
+            if (function_exists('idn_to_ascii')) {
+                // Non-transitional UTS #46, matching how browsers resolve the
+                // host (WHATWG URL): deviation characters like `ß` keep their
+                // punycode identity instead of being folded to `ss`. Explicit
+                // flags pin this across the ICU builds consumers run on.
+                $ascii = idn_to_ascii($host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+
+                // Fail open: a host idn_to_ascii cannot convert is compared
+                // as-is rather than breaking the whole visibility check.
+                if (is_string($ascii) && $ascii !== '') {
+                    $host = $ascii;
+                }
+            }
+
+            if (str_starts_with($host, 'www.')) {
+                $host = substr($host, 4);
+            }
+        }
+
+        if ($port !== null && $port !== 80 && $port !== 443) {
+            $host .= ':'.$port;
+        }
+
+        return $host;
     }
 
     /**
@@ -315,6 +456,29 @@ class TopbarMenuItem extends Model
             $visibility['auth'] = true;
         } elseif ($mode === 'guest') {
             $visibility['guest'] = true;
+        }
+
+        return $visibility === [] ? null : $visibility;
+    }
+
+    /**
+     * Apply the "hide on current domain" toggle onto an existing visibility
+     * array, preserving every other key. Callers chain this over the result of
+     * applyVisibilityMode() — never over the original array independently, or
+     * the second helper would clobber the first one's result. Returns null when
+     * the resulting array is empty.
+     *
+     * @param  array<string, mixed>|null  $current
+     * @return array<string, mixed>|null
+     */
+    public static function applyHideOnCurrentDomain(?array $current, bool $enabled): ?array
+    {
+        $visibility = $current ?? [];
+
+        if ($enabled) {
+            $visibility['hide_on_current_domain'] = true;
+        } else {
+            unset($visibility['hide_on_current_domain']);
         }
 
         return $visibility === [] ? null : $visibility;
