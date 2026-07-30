@@ -333,6 +333,36 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('<svg', $html);
     }
 
+    public function test_a_child_favicon_renders_as_an_icon_image_not_as_a_cropped_circle(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Horizon',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/horizon',
+            'favicon_url' => 'https://services.example.com/horizon/img/favicon.png',
+            'parent_id' => $parent->id,
+        ]);
+
+        $html = view('filament-topbar-menu::menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // Filament's `image` slot is an avatar-style circle (border-radius +
+        // background-size: cover), which clips a square favicon. The favicon
+        // belongs in the icon slot, where it renders as a plain, fully visible
+        // <img> at icon size — exactly like the top-level items.
+        $this->assertStringContainsString('<img src="https://services.example.com/horizon/img/favicon.png"', $html);
+        $this->assertStringNotContainsString('fi-dropdown-list-item-image', $html);
+        $this->assertStringNotContainsString('background-image', $html);
+    }
+
     public function test_groups_whose_children_are_hidden_by_the_flag_collapse_per_host(): void
     {
         // A group WITHOUT its own URL disappears entirely once the flag hides

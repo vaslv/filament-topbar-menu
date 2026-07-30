@@ -229,10 +229,17 @@ export format version is unchanged.
 
 For external links the plugin can resolve the site's favicon and store it in the `favicon_url` column, so **no remote HTTP request ever happens while the menu renders**.
 
-Resolution strategy (`FaviconResolver`):
+Resolution strategy (`FaviconResolver`), the same order a browser uses:
 
-1. Try the conventional `https://host/favicon.ico`.
-2. Fall back to parsing `<link rel="icon">` tags from the page HTML.
+1. Parse the `<link rel="icon">` tags of the page the item links to, so a
+   sub-page that declares its own icon (a Horizon or Telescope dashboard, a docs
+   section) keeps it instead of the site-wide one.
+2. Fall back to the conventional `https://host/favicon.ico`.
+
+Resolution runs **anonymously**, with no session or cookies. A page behind auth
+answers `401`/`403`, so its own icon is unreachable and the root `favicon.ico`
+is stored instead — paste the icon URL into the Favicon URL field by hand for
+those items.
 
 Ways to resolve favicons:
 

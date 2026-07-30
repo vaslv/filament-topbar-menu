@@ -7,10 +7,15 @@ use Vaslv\FilamentTopbarMenu\Support\FaviconResolver;
 
 class FaviconResolverTest extends TestCase
 {
-    public function test_it_resolves_the_conventional_favicon_ico(): void
+    public function test_it_falls_back_to_the_conventional_favicon_ico(): void
     {
         Http::fake([
             'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/some/deep/page' => Http::response(
+                '<html><head><title>No icon here</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
         ]);
 
         $favicon = app(FaviconResolver::class)->resolve('https://example.com/some/deep/page');
@@ -18,7 +23,42 @@ class FaviconResolverTest extends TestCase
         $this->assertSame('https://example.com/favicon.ico', $favicon);
     }
 
-    public function test_it_falls_back_to_parsing_link_tags_from_the_page(): void
+    public function test_the_icon_declared_by_the_page_wins_over_the_root_favicon_ico(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/vendor/horizon/img/favicon.png' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/horizon' => Http::response(
+                '<html><head><link rel="icon" type="image/png" href="/vendor/horizon/img/favicon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // A sub-page that declares its own icon (a Horizon dashboard, docs
+        // section, …) must keep it: the stored favicon is the one a browser
+        // shows in the tab for that URL, not the site-wide root icon.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/horizon');
+
+        $this->assertSame('https://example.com/vendor/horizon/img/favicon.png', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.ico');
+    }
+
+    public function test_a_page_the_resolver_cannot_read_falls_back_to_the_root_favicon_ico(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/horizon' => Http::response('Forbidden', 403),
+        ]);
+
+        // Resolution happens anonymously, so a page behind auth answers 403 and
+        // its declared icon is unreachable — the root icon is better than none.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/horizon');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+    }
+
+    public function test_it_parses_link_tags_from_the_page(): void
     {
         Http::fake([
             'https://example.com/favicon.ico' => Http::response('Not Found', 404),
@@ -186,8 +226,8 @@ class FaviconResolverTest extends TestCase
         Http::fake([
             'https://example.com/favicon.ico' => Http::response('Not Found', 404),
             'https://example.com' => Http::response(
-                // Decodes to /ic'on.png — a single quote would break out of
-                // style="background-image: url('…')" in the dropdown markup.
+                // Decodes to /ic'on.png — a single quote has no business in a
+                // stored URL that ends up in an attribute / CSS url('…') sink.
                 '<html><head><link rel="icon" href="/ic&#39;on.png"></head></html>',
                 200,
                 ['Content-Type' => 'text/html'],

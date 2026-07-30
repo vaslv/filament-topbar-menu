@@ -47,11 +47,14 @@
                             @endphp
 
                             @if ($childUrl)
+                                {{-- The marker goes in the icon slot, not in `image`: Filament
+                                     renders a slash-containing string there as an <img>, while
+                                     `image` is an avatar-style circle that crops a square favicon.
+                                     Same marker the top-level items use — see displayIcon(). --}}
                                 <x-filament::dropdown.list.item
                                     tag="a"
                                     :href="$childUrl"
-                                    :image="$child->favicon_url"
-                                    :icon="$child->favicon_url ? null : TopbarMenuItem::safeIconName($child->icon)"
+                                    :icon="$child->displayIcon()"
                                     :target="$child->resolveTarget() === TopbarMenuItem::TARGET_BLANK ? '_blank' : null"
                                     :color="$child->isActive() ? 'primary' : 'gray'"
                                 >

@@ -5,6 +5,25 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The favicon of the linked page wins over the site-wide one.** The resolver
+  tried `https://host/favicon.ico` first and only parsed the page markup when
+  that 404'd, so every item on a host with a root icon got the same icon — a
+  link to `/horizon` stored the main site's favicon instead of Horizon's. The
+  page's own `<link rel="icon">` is now asked first and the root location is the
+  fallback, which is the order a browser resolves a tab icon in. Resolution is
+  still anonymous: a page behind auth answers 401/403, so its declared icon is
+  unreachable and the root icon is stored — set those by hand.
+- **Favicons in a dropdown are no longer round-cropped.** Child items passed
+  their favicon to Filament's `image` slot, an avatar-style circle
+  (`border-radius` + `background-size: cover`) that cut the corners off a square
+  icon. The favicon now goes through the icon slot, rendering as a plain, fully
+  visible `<img>` at icon size — the same marker the top-level items already
+  used.
+
 ## [1.8.1]
 
 ### Fixed

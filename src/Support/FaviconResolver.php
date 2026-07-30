@@ -53,15 +53,27 @@ class FaviconResolver
 
         $base = $scheme.'://'.$host.($port ? ':'.$port : '');
 
-        // 1. The conventional location.
+        // 1. The icon the page itself declares, which is the one a browser
+        //    shows in the tab for exactly this URL. A sub-page (a Horizon or
+        //    Telescope dashboard, a docs section) usually overrides the site
+        //    icon this way, so asking the page first is what makes the stored
+        //    favicon match what the link actually leads to.
+        $declared = $this->resolveFromHtml($url);
+
+        if ($declared !== null) {
+            return $declared;
+        }
+
+        // 2. Fall back to the conventional root location, for pages that
+        //    declare nothing (or that the resolver cannot read — it browses
+        //    anonymously, so a page behind auth answers 401/403 here).
         $faviconUrl = $base.'/favicon.ico';
 
         if ($this->isStorableFaviconUrl($faviconUrl) && $this->isValidFavicon($faviconUrl)) {
             return $faviconUrl;
         }
 
-        // 2. Fall back to parsing <link rel="icon"> tags from the page markup.
-        return $this->resolveFromHtml($url);
+        return null;
     }
 
     protected function isValidFavicon(string $url): bool
