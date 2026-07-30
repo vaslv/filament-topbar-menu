@@ -13,8 +13,8 @@ Install dependencies with `composer install`, then use the Composer scripts:
 
 ## Requirements
 
-Requires PHP 8.4+. If you have no local PHP runtime, prefix any command with a
-Docker wrapper, e.g.:
+Requires PHP 8.2+ (see `composer.json`). If you have no local PHP runtime,
+prefix any command with a Docker wrapper, e.g.:
 
 ```
 docker run --rm -v "$PWD":/app -w /app php84-intl:latest composer check
