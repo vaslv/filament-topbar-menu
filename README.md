@@ -7,12 +7,12 @@
 A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to the panel topbar, right after the logo. Use it to link to your other services (external URLs) or to pages of the current Laravel application (named routes) — with dropdowns, favicons, per-item visibility, and caching out of the box.
 
 - 🔗 **External URLs and internal Laravel routes** (with route parameters)
-- 📂 **Nested items** — a top-level item can stay a link *and* open a dropdown with its children
-- 🖼️ **Icons and favicons** — auto-resolve favicons for external links (never at render time)
+- 📂 **Nested items** — a top-level item with children becomes a dropdown group: a pure toggle, like Filament's own top-navigation groups
+- 🖼️ **Icons and favicons** — auto-resolve favicons for external links (never at render time); a favicon replaces the item's icon
 - ⚡ **Cached** — no database query on page render; the cache is flushed automatically on changes
 - 🛠️ **Full Filament resource** — create, edit, delete, drag-and-drop reordering, activate/deactivate
 - 🌙 **Truly Filament-native look** — built from Filament's own topbar/dropdown components, so it's pixel-identical to the panel's `topNavigation()` menu (dark mode, active-item highlight, spacing) with zero custom CSS
-- 🌍 **Translatable** — ships with English, Russian, German, Spanish and French; add your own
+- 🌍 **Translatable** — ships with 13 languages out of the box (see [Translations](#translations)); add your own
 - 🪝 Rendered through the official `PanelsRenderHook::TOPBAR_LOGO_AFTER` render hook — no layout overrides
 
 ## Requirements
@@ -79,23 +79,61 @@ TopbarMenuPlugin::make()
 
 ### Responsive behavior
 
-The default `TOPBAR_LOGO_AFTER` hook renders the menu inside Filament's
-`.fi-topbar-start` region, which Filament itself hides below the `lg` (1024px)
-breakpoint — the same as its logo/sidebar controls. So with the default hook the
-menu is visible on desktop widths and hidden on smaller screens, consistent with
-the rest of the Filament topbar.
+The menu is hidden below the `lg` (1024px) breakpoint, for two independent
+reasons:
 
-If you need the menu on narrow viewports, register it at a hook that stays visible
-there, e.g. `->renderHook(\Filament\View\PanelsRenderHook::TOPBAR_END)`.
+1. The default `TOPBAR_LOGO_AFTER` hook renders it inside Filament's
+   `.fi-topbar-start` region, which Filament itself hides below `lg` — the same
+   as its logo and sidebar controls.
+2. The menu's own root element is `<ul class="fi-topbar-nav-groups">`, Filament's
+   top-navigation list class, which is `hidden lg:flex` in Filament's own CSS.
+
+Because of (2), **changing the render hook alone does not make the menu appear on
+narrow viewports** — at `TOPBAR_START` or `TOPBAR_END` it renders outside
+`.fi-topbar-start`, but its own `<ul>` is still `display: none` below 1024px.
+
+To show it there, register the menu at a hook outside `.fi-topbar-start` and add
+a CSS rule that undoes the hiding. A default install has no stylesheet of its
+own, so inject one from the panel:
+
+```php
+use Filament\View\PanelsRenderHook;
+
+$panel
+    ->plugin(TopbarMenuPlugin::make()->renderHook(PanelsRenderHook::TOPBAR_END))
+    ->renderHook(
+        PanelsRenderHook::STYLES_AFTER,
+        fn (): string => '<style>.fi-topbar-nav-groups { display: flex; }</style>',
+    );
+```
+
+Two things to expect, both coming from Filament's own CSS rather than from this
+package:
+
+- The same class is used by Filament's native top navigation, so on a panel with
+  `topNavigation()` the rule un-hides that menu below `lg` as well.
+- Filament puts `flex-wrap` and the row gap inside its `lg` media query, so below
+  that width the menu is a single non-wrapping row inside `.fi-topbar-ctn`, which
+  clips horizontal overflow. Add `flex-wrap: wrap` to the rule (or keep the menu
+  short) if your items do not fit.
+
+Utility classes (`flex`, `items-center`, …) are not an option here: Filament's
+precompiled theme contains only its own `.fi-*` rules, so utilities exist only in
+panels with a custom Filament theme whose Tailwind build scans the published
+views.
 
 ## Managing menu items
 
 Menu items live in the `filament_topbar_menu_items` table and are managed through the included Filament resource:
 
-- **Label**, **icon** (any Filament-supported icon, e.g. `heroicon-o-link`) and **favicon URL**
+- **Label**, **icon** (any Filament-supported icon, e.g. `heroicon-o-link`) and **favicon URL** — an item shows one marker, and a favicon URL always wins over the icon name
 - **Link type** — external `URL` or internal `Laravel route` (with optional route parameters)
 - **Target** — open in the same tab or a new tab
-- **Parent item** — items with a parent are shown in the parent's dropdown
+- **Parent item** — items with a parent are shown in the parent's dropdown. The
+  menu renders exactly two levels. **Deleting an item deletes its children with
+  it** (a database-level cascade, no extra confirmation). Giving a parent item a
+  parent of its own keeps the rows but drops them off the menu: its children land
+  on a third level, which is never rendered
 - **Active** toggle and **sort** order (rows can also be reordered by drag & drop)
 - **Visibility** — everyone, authenticated users only, or guests only
 
@@ -167,6 +205,12 @@ The per-item **target** is authoritative: "Same tab" (`_self`) always opens in t
 
 ### Example: internal route links
 
+The resource's **Route name** picker lists your application's named routes, minus
+every name containing `livewire` — Livewire's own internal endpoints are never
+menu targets. The match is a substring, so a route of yours whose name happens to
+contain that word is hidden from the picker too; set `route` directly (as below)
+for such an item.
+
 ```php
 TopbarMenuItem::create([
     'label' => 'Orders',
@@ -189,8 +233,19 @@ If a named route no longer exists, the item is skipped instead of breaking the p
 A top-level item with children renders as a Filament dropdown group — exactly like
 the panel's native top navigation. The group label is a pure dropdown toggle and
 the children are its links. Like Filament's own groups, the toggle itself does not
-navigate: if a parent has children, its own `url`/`route` is ignored, so to make a
-landing page reachable add it as an explicit child item.
+navigate: while a parent has at least one child *visible to the current user*, its
+own `url`/`route` is ignored, so to make a landing page reachable add it as an
+explicit child item.
+
+Visibility is evaluated per request, so this can flip: if every child is inactive
+or hidden from the current user, the parent stops being a dropdown and renders as
+an ordinary link using its own `url`/`route` — and disappears entirely when it has
+none.
+
+Two levels is the whole depth: a child of a child is never rendered. Moving a
+group under another group therefore takes its children off the menu — the rows
+stay in the table, they just stop being rendered — while deleting a group really
+does delete its children (`parent_id` cascades on delete).
 
 ```php
 $services = TopbarMenuItem::create([
@@ -242,24 +297,31 @@ menu between installs (e.g. staging → production) or keeping it as a backup.
 - **Export** downloads a JSON file with every item and all of its settings —
   hierarchy, URLs/routes with parameters, targets, icons, favicons, sort order,
   active state, and visibility rules (including `roles`).
-- **Import** accepts such a file and recreates the items. By default the items
-  are **appended** to the existing menu; enable *"Replace the current menu"* in
-  the import dialog to wipe the menu first. The whole file is validated before
-  anything is written, and the import runs in a single transaction — a broken
-  file never deletes or half-imports anything.
+- **Import** accepts such a file and recreates the items. By default they are
+  **added to** the existing menu, each keeping the `sort` value it had in the
+  file — so they interleave with the current items instead of landing at the
+  end; re-sort afterwards, or enable *"Replace the current menu"* in the import
+  dialog to wipe the menu first. The whole file is validated before anything is
+  written, and the import runs in a single transaction — a broken file never
+  deletes or half-imports anything.
 
 Because the file is untrusted input, import re-applies the same guards as the
 form: URLs and favicon URLs must be plain `http(s)` links (a `javascript:` or
 `data:` link is rejected, never rendered into the topbar), route parameters must
 be scalar, visibility rules must be well-shaped, and the tree may be at most two
-levels deep. Export is gated behind the resource's *view* permission and import
-behind *create*; the replace option only appears for users the *delete* policy
+levels deep. Export is gated behind the resource's *viewAny* permission and import
+behind *create*; the replace option only appears for users the *deleteAny* policy
 allows.
 
 The file contains no database ids (hierarchy is expressed by nesting), so an
 export from one application imports cleanly into another. Unknown keys are
 ignored, so a file from a newer plugin version still imports as long as its
-export format version is unchanged.
+export format version is unchanged. Values are copied verbatim, though, so an
+absolute `url` still points at the source environment's host and a `route` name
+that does not exist in the target application resolves to nothing (the item is
+skipped at render time). A relative `url` such as `/horizon` — what the demo
+seeder writes — is not portable at all: the import requires a full `http(s)` URL
+with a host and rejects the whole file if one is missing.
 
 ## Favicons
 
@@ -277,9 +339,11 @@ unbounded number of outbound requests, and relative hrefs are resolved against
 the URL that actually answered (after redirects).
 
 Resolution runs **anonymously**, with no session or cookies. A page behind auth
-answers `401`/`403`, so its own icon is unreachable and the root `favicon.ico`
-is stored instead — paste the icon URL into the Favicon URL field by hand for
-those items.
+answers `401`/`403`, so its own icon is unreachable; the root `favicon.ico` is
+stored instead when that one answers `2xx` with a non-empty body whose
+`Content-Type` is absent or mentions `image`, `icon` or `octet-stream` (an HTML
+error page is rejected), and otherwise nothing is stored at all — paste the icon
+URL into the Favicon URL field by hand for those items.
 
 The resolver also treats every linked site as untrusted and **refuses to fetch
 private, loopback, link-local and reserved addresses** (including cloud metadata
@@ -296,12 +360,14 @@ Ways to resolve favicons:
 
 ```bash
 # Fill favicons for items that don't have one yet:
+# (items that already carry one are left alone — use --force to re-resolve them)
 php artisan filament-topbar-menu:refresh-favicons
 
 # Re-resolve all favicons (including existing ones):
 php artisan filament-topbar-menu:refresh-favicons --force
 
-# Only specific items:
+# Only specific items (still skips the ones that already have a favicon,
+# so combine with --force to re-resolve them):
 php artisan filament-topbar-menu:refresh-favicons --id=1 --id=2
 ```
 
@@ -405,8 +471,9 @@ on the first request after the table exists.
 The switch can also be finished from the panel, without console access: when
 the table is missing, the menu items page renders an explanation instead of
 failing, and users allowed to create menu items get a **Create menu table**
-header action (next to Export/Import) that performs the same
-create-and-copy as the deploy command.
+header action that performs the same create-and-copy as the deploy command. It
+is the only action offered in that state — Export, Import and Create are hidden
+while the table is missing, and come back once it exists.
 
 The old table stays behind on the previous connection — drop it manually once
 you have verified the move. For moves the copy flag does not cover (e.g.
@@ -518,9 +585,8 @@ Views are published to `resources/views/vendor/filament-topbar-menu`.
 
 ## Translations
 
-The entire interface (resource form, table, actions, notifications, the artisan
-command output and the menu's ARIA labels) is translatable. The package ships
-with:
+The entire interface (resource form, table, infolist, actions, notifications and
+the artisan command output) is translatable. The package ships with:
 
 - English (`en`)
 - Arabic (`ar`)
@@ -560,7 +626,7 @@ composer check        # lint:test + analyse + test (what CI runs)
 ```
 
 CI runs the full test matrix (PHP 8.2 / 8.3 / 8.4) plus a code-quality job
-(Pint + PHPStan) on every push and pull request.
+(Pint + PHPStan) on every pull request and on pushes to `main`.
 
 ## License
 

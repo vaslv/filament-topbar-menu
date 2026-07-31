@@ -27,8 +27,14 @@ return [
     | a separate database — for example, one database shared by several apps so
     | they all render a single, centrally managed menu.
     |
-    | When a non-default connection is used, publish and run the migration on
-    | that connection (its schema must contain the menu items table).
+    | The bundled migration reads this value itself, so on a fresh install plain
+    | `php artisan migrate` creates the table on the configured connection — no
+    | publishing, and never `migrate --database=…`, which would relocate the
+    | migration repository and replay every app migration against the shared
+    | database. On an install that switches connections later, the migration is
+    | already recorded as run, so use the command instead:
+    |
+    |   php artisan filament-topbar-menu:create-table --copy-from-default
     |
     */
 
@@ -62,6 +68,8 @@ return [
     | "Fetch favicon" action in the resource, or run:
     |
     |   php artisan filament-topbar-menu:refresh-favicons
+    |
+    | Disabled, the actions and the command become no-ops and nothing is fetched.
     |
     | `favicon_request_timeout` is the timeout in seconds of a SINGLE outbound
     | request, not of resolving one item: resolving fetches the linked page, then
@@ -105,13 +113,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | External links
+    | Link target
     |--------------------------------------------------------------------------
     |
     | The default value of the "Target" field when creating a new menu item:
     | when enabled, new items default to opening in a new tab. This is only a
     | default — the per-item choice ("Same tab" / "New tab") is always honored
     | at render time and is never overridden.
+    |
+    | The field itself is offered for route items too, and their stored target
+    | is honored the same way; only this default is phrased around external
+    | links, since that is the case it exists for.
     |
     */
 

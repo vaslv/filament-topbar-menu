@@ -5,7 +5,7 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.0]
 
 ### Added
 
@@ -86,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallback, which is the order a browser resolves a tab icon in. Resolution is
   still anonymous: a page behind auth answers 401/403, so its declared icon is
   unreachable and the root icon is stored — set those by hand.
+
+  Items that already carry a favicon keep the one the old order picked: a plain
+  `php artisan filament-topbar-menu:refresh-favicons` only fills empty ones. Run
+  it with `--force` (or use the row/bulk action) to re-resolve an existing menu
+  under the new order.
 - **Favicons in a dropdown are no longer round-cropped.** Child items passed
   their favicon to Filament's `image` slot, an avatar-style circle
   (`border-radius` + `background-size: cover`) that cut the corners off a square
