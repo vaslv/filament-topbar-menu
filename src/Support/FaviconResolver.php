@@ -30,11 +30,21 @@ class FaviconResolver
 
     /**
      * Hard cap on how many bytes of a response body are read into memory. A
-     * favicon is a few KB and only a page's <head> is scanned for <link>
-     * tags, so this is ample — it stops a malicious host from OOM-ing the
+     * favicon is a few KB, and a page's icon <link> tags sit in its <head>, so
+     * this is ample for the markup that matters — the whole capped body is what
+     * gets scanned, and the cap is what stops a malicious host from OOM-ing the
      * worker with a multi-gigabyte response.
      */
     protected const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+    /**
+     * How many `<link rel="icon">` candidates from one page are worth probing.
+     * Each probe is a full HTTP request (times MAX_REDIRECTS hops, times the
+     * configured timeout), and a hostile page can declare thousands of them —
+     * so the page does not get to decide how long the worker is busy or how
+     * many outbound requests it makes.
+     */
+    protected const MAX_ICON_CANDIDATES = 5;
 
     public function resolve(string $url): ?string
     {
@@ -101,7 +111,13 @@ class FaviconResolver
 
     protected function resolveFromHtml(string $pageUrl): ?string
     {
-        $response = $this->request($pageUrl);
+        // Relative hrefs belong to the page that actually answered, not to the
+        // URL asked for: `https://host/docs` → 301 → `https://host/docs/` with
+        // href="favicon.png" means /docs/favicon.png, and resolving against the
+        // pre-redirect URL would silently pick the site-wide icon instead.
+        $finalUrl = $pageUrl;
+
+        $response = $this->request($pageUrl, $finalUrl);
 
         if ($response === null || ! $response->successful()) {
             return null;
@@ -110,6 +126,8 @@ class FaviconResolver
         if (! preg_match_all('/<link\b[^>]*>/i', $this->limitedBody($response), $matches)) {
             return null;
         }
+
+        $candidates = [];
 
         foreach ($matches[0] as $tag) {
             if (! preg_match('/\brel\s*=\s*["\']([^"\']*)["\']/i', $tag, $rel)) {
@@ -124,18 +142,33 @@ class FaviconResolver
                 continue;
             }
 
-            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href[1]), $pageUrl);
+            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href[1]), $finalUrl);
 
             if ($candidate === null) {
                 continue;
             }
 
             // Only ever persist a plain http(s) URL that is safe to drop into the
-            // panel's CSS `url('…')` / HTML context (no quotes, angle brackets,
-            // control chars; within the column limit; no `data:` URIs). Skip
-            // anything else and keep looking. The candidate must also resolve to a
-            // real image so a wrong href isn't saved as a silently-broken favicon.
-            if ($this->isStorableFaviconUrl($candidate) && $this->isValidFavicon($candidate)) {
+            // panel's `<img src>` / CSS `url('…')` context (no quotes, angle
+            // brackets, control chars; within the column limit; no `data:` URIs).
+            // Skip anything else and keep looking.
+            if (! $this->isStorableFaviconUrl($candidate)) {
+                continue;
+            }
+
+            // Deduplicate before counting: a page repeating one href across
+            // several rel variants must not eat the probe budget.
+            $candidates[$candidate] = true;
+
+            if (count($candidates) >= self::MAX_ICON_CANDIDATES) {
+                break;
+            }
+        }
+
+        foreach (array_keys($candidates) as $candidate) {
+            // The candidate must resolve to a real image, so a wrong href isn't
+            // saved as a silently-broken favicon.
+            if ($this->isValidFavicon($candidate)) {
                 return $candidate;
             }
         }
@@ -144,9 +177,14 @@ class FaviconResolver
     }
 
     /**
-     * Resolve a favicon href (from a <link> tag) against the page URL it was
-     * found on, honoring absolute, scheme-relative, root-relative and
-     * path-relative (including ../) forms. Returns null for host-less pages.
+     * Resolve a URL found in a document against the page it came from, honoring
+     * absolute, scheme-relative, root-relative and path-relative (including ../)
+     * forms. Returns null for host-less pages.
+     *
+     * Two callers, both security-relevant: favicon hrefs from a <link> tag, and
+     * the `Location` header of a redirect — whose result goes straight back
+     * through the SSRF check at the top of request(), so a hop must never come
+     * out of here as anything but an absolute, checkable URL.
      */
     protected function makeAbsoluteUrl(string $href, string $pageUrl): ?string
     {
@@ -211,10 +249,19 @@ class FaviconResolver
         return '/'.implode('/', $segments);
     }
 
-    protected function request(string $url): ?Response
+    /**
+     * @param  string|null  $finalUrl  Set to the URL that actually answered, so
+     *                                 relative hrefs in the body can be resolved
+     *                                 against it instead of the requested URL.
+     */
+    protected function request(string $url, ?string &$finalUrl = null): ?Response
     {
+        $finalUrl = $url;
+
         try {
             for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
+                $finalUrl = $url;
+
                 $host = parse_url($url, PHP_URL_HOST);
 
                 if (blank($host) || $this->hostIsBlocked((string) $host)) {
@@ -260,15 +307,33 @@ class FaviconResolver
      * private, loopback, link-local or otherwise reserved address — the classic
      * SSRF targets, including the cloud metadata endpoint 169.254.169.254.
      *
-     * A host that does not resolve at all is left alone: the HTTP client uses
-     * the same system resolver, so it cannot reach an unresolvable host either,
-     * and blocking here would only break unknown/offline hosts without adding
-     * protection. Residual: a DNS-rebind between this check and the request is
-     * not defended against — accepted for a favicon resolver.
+     * A host NAME that does not resolve is left alone: the HTTP client uses the
+     * same system resolver, so it cannot reach an unresolvable name either, and
+     * blocking here would only break unknown/offline hosts without adding
+     * protection. That leniency must not extend to numeric literals, though —
+     * curl accepts hex/octal/dword/short spellings of an IPv4 address that
+     * filter_var() never recognizes and the system resolver recognizes only
+     * sometimes (on glibc `0177.0.0.1` resolves and is caught above, while
+     * `0x7f.0.0.1` resolves nowhere yet still reaches 127.0.0.1), so anything
+     * that is not shaped like a host name is refused here.
+     * Residual: a DNS-rebind between this check and the request is not defended
+     * against — accepted for a favicon resolver.
      */
     protected function hostIsBlocked(string $host): bool
     {
         $host = trim($host, '[]');
+
+        // An IPv6 literal, with or without a zone id (`fe80::1%25en0`). curl
+        // honours the zone and connects to the link-local address, while
+        // filter_var() refuses to parse the zone-qualified form at all — so
+        // validate the address part alone and refuse anything unparseable
+        // instead of letting it fall through to the host-name branch.
+        if (str_contains($host, ':')) {
+            $address = rawurldecode($host);
+            $address = strstr($address, '%', true) ?: $address;
+
+            return ! filter_var($address, FILTER_VALIDATE_IP) || ! $this->ipIsPublic($address);
+        }
 
         if (filter_var($host, FILTER_VALIDATE_IP)) {
             return ! $this->ipIsPublic($host);
@@ -277,7 +342,7 @@ class FaviconResolver
         $ips = $this->resolveHostIps($host);
 
         if ($ips === []) {
-            return false;
+            return ! $this->looksLikeHostName($host);
         }
 
         foreach ($ips as $ip) {
@@ -287,6 +352,34 @@ class FaviconResolver
         }
 
         return false;
+    }
+
+    /**
+     * Whether a host is shaped like a DNS name rather than a numeric address
+     * literal. The test is the last label: a real host name ends in a letter-
+     * initial TLD, while every numeric spelling curl accepts — `0x7f.0.0.1`,
+     * `0177.0.0.1`, `2130706433`, `127.1` — ends in a digit-initial one.
+     *
+     * Unicode host names are folded to punycode first (`пример.рф` →
+     * `xn--e1afmkfd.xn--p1ai`), because the system resolver does not speak IDN
+     * while an IDN-capable curl does: without the fold, a perfectly real IDN
+     * site would be treated as a numeric literal and refused. Same flags as
+     * TopbarMenuItem's host matching, and the same graceful degradation when
+     * ext-intl is missing.
+     */
+    protected function looksLikeHostName(string $host): bool
+    {
+        if (function_exists('idn_to_ascii')) {
+            $ascii = idn_to_ascii($host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+
+            if (is_string($ascii) && $ascii !== '') {
+                $host = $ascii;
+            }
+        }
+
+        $labels = explode('.', rtrim($host, '.'));
+
+        return preg_match('/^[a-z]/i', (string) end($labels)) === 1;
     }
 
     protected function ipIsPublic(string $ip): bool
@@ -319,9 +412,14 @@ class FaviconResolver
     /**
      * Whether a resolved favicon URL is safe to persist and later render. Only
      * plain http(s) URLs within the storage column limit, with no characters
-     * that could break out of the panel's CSS `url('…')` / HTML attribute
-     * context (quotes, angle brackets, whitespace, backslash). Rejects `data:`
-     * URIs, which are unbounded in length and land in the same CSS sink.
+     * that could break out of an HTML attribute context (quotes, angle brackets,
+     * whitespace, backslash). Rejects `data:` URIs, which are unbounded in
+     * length.
+     *
+     * The package renders the value through Filament's icon slot, as an escaped
+     * `<img src>`; the rule stays this strict because a published view may still
+     * put it in a CSS `url('…')` sink, and because a stored value that a browser
+     * parses differently than PHP does is worth refusing on its own.
      */
     protected function isStorableFaviconUrl(string $url): bool
     {

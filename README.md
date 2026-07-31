@@ -272,10 +272,21 @@ Resolution strategy (`FaviconResolver`), the same order a browser uses:
    section) keeps it instead of the site-wide one.
 2. Fall back to the conventional `https://host/favicon.ico`.
 
+At most five declared icons are probed per page, so a page cannot dictate an
+unbounded number of outbound requests, and relative hrefs are resolved against
+the URL that actually answered (after redirects).
+
 Resolution runs **anonymously**, with no session or cookies. A page behind auth
 answers `401`/`403`, so its own icon is unreachable and the root `favicon.ico`
 is stored instead — paste the icon URL into the Favicon URL field by hand for
 those items.
+
+The resolver also treats every linked site as untrusted and **refuses to fetch
+private, loopback, link-local and reserved addresses** (including cloud metadata
+endpoints), re-checking every redirect hop and every numeric spelling of an
+address. A menu item pointing at an internal-only host therefore never gets an
+auto-resolved favicon: fill the field by hand, or serve the icon from a publicly
+reachable URL.
 
 Ways to resolve favicons:
 

@@ -44,6 +44,25 @@ class FaviconResolverTest extends TestCase
         Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.ico');
     }
 
+    public function test_a_declared_icon_that_does_not_resolve_falls_back_to_the_root_favicon_ico(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/broken.png' => Http::response('Not Found', 404),
+            'https://example.com/docs' => Http::response(
+                '<html><head><link rel="icon" href="/broken.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // The page declares an icon, but it 404s. The reorder must fall through
+        // to the root location rather than storing nothing at all.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/docs');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+    }
+
     public function test_a_page_the_resolver_cannot_read_falls_back_to_the_root_favicon_ico(): void
     {
         Http::fake([
@@ -187,6 +206,109 @@ class FaviconResolverTest extends TestCase
         $this->assertNull($resolver->resolve('http://[::1]/'));
 
         Http::assertNothingSent();
+    }
+
+    public function test_numeric_host_spellings_that_curl_understands_are_refused(): void
+    {
+        Http::fake();
+
+        $resolver = app(FaviconResolver::class);
+
+        // curl resolves every one of these to a loopback / link-local address
+        // (verified: `curl http://0x7f.0.0.1:PORT/` answers from 127.0.0.1),
+        // while filter_var() sees no IP and the system resolver returns nothing
+        // for the hex form — so the "unresolvable host" leniency must not cover
+        // numeric literals.
+        $this->assertNull($resolver->resolve('http://0x7f.0.0.1/'));
+        $this->assertNull($resolver->resolve('http://0177.0.0.1/'));
+        $this->assertNull($resolver->resolve('http://2130706433/'));
+        $this->assertNull($resolver->resolve('http://127.1/'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_zone_qualified_ipv6_literals_are_refused(): void
+    {
+        Http::fake();
+
+        $resolver = app(FaviconResolver::class);
+
+        // curl honours the zone id and connects to the link-local address,
+        // while filter_var() cannot parse the zone-qualified form — so the
+        // address part has to be checked on its own.
+        $this->assertNull($resolver->resolve('http://[fe80::1%25en0]/'));
+        $this->assertNull($resolver->resolve('http://[fe80::1]/'));
+        $this->assertNull($resolver->resolve('http://[::ffff:127.0.0.1]/'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_unicode_host_name_is_still_reachable(): void
+    {
+        Http::fake([
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // The system resolver does not speak IDN, so this host looks
+        // unresolvable — but an IDN-capable curl reaches it, and the numeric-
+        // literal guard must not turn "unresolvable name" into "blocked".
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://пример.рф/docs'));
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'docs'));
+    }
+
+    public function test_a_page_cannot_dictate_an_unbounded_number_of_icon_probes(): void
+    {
+        $links = '';
+
+        for ($i = 0; $i < 50; $i++) {
+            $links .= '<link rel="icon" href="/icon-'.$i.'.png">';
+        }
+
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/icon-*' => Http::response('Not Found', 404),
+            'https://example.com' => Http::response(
+                '<html><head>'.$links.'</head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com'));
+
+        // One page fetch + at most MAX_ICON_CANDIDATES probes + the root
+        // fallback — not one request per declared icon.
+        $probes = 0;
+
+        foreach (Http::recorded() as [$request]) {
+            if (str_contains($request->url(), '/icon-')) {
+                $probes++;
+            }
+        }
+
+        $this->assertLessThanOrEqual(5, $probes);
+    }
+
+    public function test_relative_hrefs_are_resolved_against_the_url_that_answered(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/docs/favicon.png' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/docs' => Http::response('', 301, ['Location' => 'https://example.com/docs/']),
+            'https://example.com/docs/' => Http::response(
+                '<html><head><link rel="icon" href="favicon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // The canonical trailing-slash redirect: resolving the relative href
+        // against the requested URL would pick /favicon.png — the site-wide
+        // icon this whole resolution order exists to stop preferring.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/docs');
+
+        $this->assertSame('https://example.com/docs/favicon.png', $favicon);
     }
 
     public function test_a_redirect_to_an_internal_address_is_not_followed(): void

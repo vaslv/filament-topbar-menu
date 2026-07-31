@@ -183,8 +183,8 @@ class MenuTransfer
      * form's own validation never touched, yet its values flow straight into
      * the topbar rendered on every panel page. So this repeats the guarantees
      * the form and FaviconResolver enforce — an `url`/`favicon_url` must be a
-     * plain http(s) link (blocking `javascript:`/`data:` hrefs and CSS-`url()`
-     * breakouts), `route_parameters` must be scalar, and `visibility` must be
+     * plain http(s) link (blocking `javascript:`/`data:` hrefs and attribute or
+     * CSS-`url()` breakouts), `route_parameters` must be scalar, and `visibility` must be
      * well-shaped — rather than trusting the file to be well-formed.
      *
      * @param  array<int, mixed>  $items
@@ -230,7 +230,7 @@ class MenuTransfer
                 }
             }
 
-            // `url` becomes an anchor href and `favicon_url` a CSS url() value,
+            // `url` becomes an anchor href and `favicon_url` an image source,
             // both rendered to every panel user; only plain http(s) links are
             // safe there. filled() lets a dropdown group keep an empty url.
             if (filled($item['url'] ?? null) && ! $this->isSafeHttpUrl($item['url'])) {
@@ -290,10 +290,11 @@ class MenuTransfer
     }
 
     /**
-     * Mirror of FaviconResolver::isStorableFaviconUrl: the value lands in a CSS
-     * `url('…')` sink in the rendered dropdown, so it must be a bounded http(s)
-     * URL with no quotes, angle brackets, whitespace or backslashes that could
-     * break out of the CSS string.
+     * Mirror of FaviconResolver::isStorableFaviconUrl: the value is rendered on
+     * every panel page — today as an escaped `<img src>` through Filament's icon
+     * slot, and as a CSS `url('…')` value in any view published before that — so
+     * it must be a bounded http(s) URL with no quotes, angle brackets,
+     * whitespace or backslashes that could break out of either context.
      */
     protected function isStorableFaviconUrl(string $url): bool
     {

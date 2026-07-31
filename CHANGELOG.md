@@ -40,8 +40,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page itself (`sections.record`, `columns.resolved_url`, `columns.created_at`,
   `columns.updated_at`) and one for the roles row (`fields.visibility.roles`).
 
+### Security
+
+- **Numeric host spellings can no longer slip past the favicon resolver's SSRF
+  guard.** The guard deliberately fails open for hosts that do not resolve, on
+  the reasoning that the HTTP client cannot reach them either. That is only true
+  for host *names*: curl also accepts hex, octal, dword and short IPv4 literals.
+  Whether the system resolver recognizes those is a libc detail — on glibc
+  `0177.0.0.1`, `2130706433` and `127.1` do resolve, so they were already
+  refused as private addresses, while `0x7f.0.0.1` resolves nowhere and reached
+  127.0.0.1 unchecked. The guard still asks the resolver first; what changed is
+  the fallback, which no longer waves a host through just because nothing came
+  back. A host that does not resolve is refused unless it is shaped like a DNS
+  name — with `ext-intl` installed, Unicode names are folded to punycode first,
+  so an IDN site stays reachable even though the resolver cannot look it up;
+  without the extension such a host is refused, which is the safe direction.
+  Zone-qualified IPv6 literals (`[fe80::1%25en0]`) took the same route out and
+  are now validated as addresses. This mattered more after
+  the resolution-order change below: a linked page's `<link rel="icon">` is read
+  on every resolve now, so the address came from a third-party page rather than
+  from the admin's own URL.
+- **A linked page can no longer dictate how many outbound requests the resolver
+  makes.** Every declared icon was probed with a full HTTP request (up to 4 hops
+  × the configured timeout each), over a page body of up to 2 MB — enough
+  declarations to hold a PHP worker for hours. Candidates are now deduplicated
+  and capped at five per page.
+
 ### Fixed
 
+- **A favicon that is not a URL no longer takes the panel down.** `displayIcon()`
+  returned `favicon_url` verbatim, and Filament reads a string without a slash
+  as an icon *name* — `SvgNotFound`, on every panel page, since the menu renders
+  on all of them. Every write path in the package stores a URL, so such a value
+  only arrives from a fleet-shared menu table written by a sibling app, a seeder
+  or hand-written SQL. It is now skipped in favour of the item's icon name.
+- **Relative icon hrefs are resolved against the URL that answered**, not the one
+  requested. On the canonical `https://host/docs` → `https://host/docs/`
+  redirect, `href="favicon.png"` resolved to `/favicon.png` — the site-wide icon
+  the new resolution order exists to stop preferring.
 - **The favicon of the linked page wins over the site-wide one.** The resolver
   tried `https://host/favicon.ico` first and only parsed the page markup when
   that 404'd, so every item on a host with a root icon got the same icon — a

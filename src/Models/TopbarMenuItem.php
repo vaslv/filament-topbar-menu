@@ -486,13 +486,25 @@ class TopbarMenuItem extends Model
 
     /**
      * The visual marker of the item exactly as the topbar renders it: the
-     * favicon URL when one is set (Filament renders slash-containing strings
-     * as an <img>), otherwise the validated icon name. Shared by the topbar
-     * view and the admin table so the two never disagree.
+     * favicon URL when one is set AND URL-shaped (Filament renders only
+     * slash-containing strings as an <img>; see below), otherwise the validated
+     * icon name — so a favicon always replaces the icon. Shared by every surface
+     * that shows the marker — the topbar, its dropdowns, the admin table and
+     * the View page — so none of them can disagree with the rendered menu.
      */
     public function displayIcon(): ?string
     {
-        return $this->favicon_url ?: static::safeIconName($this->icon);
+        // Only a URL-shaped favicon may reach Filament's icon slot: it renders
+        // a slash-containing string as an <img>, but treats anything else as a
+        // registered icon NAME and throws SvgNotFound — which 500s every panel
+        // page, since the menu renders on all of them. Every write path in this
+        // package stores a URL, so a slash-less value comes from somewhere else:
+        // a fleet-shared menu table written by a sibling app, a seeder, or SQL.
+        if (filled($this->favicon_url) && str_contains($this->favicon_url, '/')) {
+            return $this->favicon_url;
+        }
+
+        return static::safeIconName($this->icon);
     }
 
     /**

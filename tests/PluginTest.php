@@ -333,6 +333,41 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('<svg', $html);
     }
 
+    public function test_a_favicon_that_is_not_a_url_does_not_reach_the_icon_renderer(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+        ]);
+
+        // Not reachable through the form, the import or the resolver — but a
+        // fleet-shared menu table also takes rows from sibling apps, seeders
+        // and hand-written SQL, and this value would otherwise be handed to
+        // Filament as an icon NAME: SvgNotFound, on every panel page.
+        $child = TopbarMenuItem::create([
+            'label' => 'Broken',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://broken.example.com',
+            'icon' => 'heroicon-o-link',
+            'parent_id' => $parent->id,
+        ]);
+
+        $child->forceFill(['favicon_url' => 'not-a-url'])->save();
+
+        $html = view('filament-topbar-menu::menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertStringContainsString('Broken', $html);
+        $this->assertStringNotContainsString('not-a-url', $html);
+
+        // The stored Heroicon name still renders — the guard skips the unusable
+        // favicon rather than blanking the item's marker.
+        $this->assertStringContainsString('<svg', $html);
+    }
+
     public function test_a_child_favicon_renders_as_an_icon_image_not_as_a_cropped_circle(): void
     {
         $parent = TopbarMenuItem::create([
