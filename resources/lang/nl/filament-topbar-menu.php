@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Link',
         'appearance' => 'Weergave & gedrag',
+        'record' => 'Record',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Zichtbaar voor',
             'placeholder' => 'Iedereen',
             'helper' => 'Op rollen gebaseerde zichtbaarheid (de sleutel "roles") blijft behouden wanneer deze rechtstreeks op het record is ingesteld.',
+            'roles' => 'Beperkt tot rollen',
             'options' => [
                 'auth' => 'Alleen ingelogde gebruikers',
                 'guest' => 'Alleen gasten',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Volgorde',
         'hidden_on_current_domain' => 'Verborgen op dit domein',
         'hidden_on_current_domain_tooltip' => 'Verborgen op dit domein; zichtbaar op de overige services van de vloot.',
+        'resolved_url' => 'Uiteindelijke link',
+        'created_at' => 'Aangemaakt',
+        'updated_at' => 'Bijgewerkt',
     ],
 
     'filters' => [

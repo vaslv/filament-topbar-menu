@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'پیوند',
         'appearance' => 'ظاهر و رفتار',
+        'record' => 'رکورد',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'قابل مشاهده برای',
             'placeholder' => 'همه',
             'helper' => 'نمایش بر اساس نقش (کلید «roles») هنگام تنظیم مستقیم روی رکورد حفظ می‌شود.',
+            'roles' => 'محدود به نقش‌ها',
             'options' => [
                 'auth' => 'فقط کاربران واردشده',
                 'guest' => 'فقط مهمانان',
@@ -83,6 +85,9 @@ return [
         'sort' => 'ترتیب',
         'hidden_on_current_domain' => 'در این دامنه پنهان است',
         'hidden_on_current_domain_tooltip' => 'در این دامنه پنهان است؛ در سایر سرویس‌های ناوگان دیده می‌شود.',
+        'resolved_url' => 'پیوند نهایی',
+        'created_at' => 'تاریخ ایجاد',
+        'updated_at' => 'تاریخ به‌روزرسانی',
     ],
 
     'filters' => [

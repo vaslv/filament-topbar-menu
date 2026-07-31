@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Collegamento',
         'appearance' => 'Aspetto e comportamento',
+        'record' => 'Record',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Visibile a',
             'placeholder' => 'Tutti',
             'helper' => 'La visibilità basata sui ruoli (chiave "roles") viene preservata se impostata direttamente sul record.',
+            'roles' => 'Limitato ai ruoli',
             'options' => [
                 'auth' => 'Solo utenti autenticati',
                 'guest' => 'Solo ospiti',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Ordine',
         'hidden_on_current_domain' => 'Nascosto su questo dominio',
         'hidden_on_current_domain_tooltip' => 'Nascosto su questo dominio; visibile sugli altri servizi della flotta.',
+        'resolved_url' => 'Link risolto',
+        'created_at' => 'Creato',
+        'updated_at' => 'Aggiornato',
     ],
 
     'filters' => [

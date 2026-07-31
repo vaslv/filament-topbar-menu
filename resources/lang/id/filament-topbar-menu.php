@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Tautan',
         'appearance' => 'Tampilan & perilaku',
+        'record' => 'Data',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Terlihat oleh',
             'placeholder' => 'Semua orang',
             'helper' => 'Visibilitas berbasis peran (kunci "roles") tetap dipertahankan jika diatur langsung pada record.',
+            'roles' => 'Dibatasi untuk peran',
             'options' => [
                 'auth' => 'Hanya pengguna terautentikasi',
                 'guest' => 'Hanya tamu',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Urutan',
         'hidden_on_current_domain' => 'Disembunyikan di domain ini',
         'hidden_on_current_domain_tooltip' => 'Disembunyikan di domain ini; tetap terlihat di layanan armada lainnya.',
+        'resolved_url' => 'Tautan hasil',
+        'created_at' => 'Dibuat',
+        'updated_at' => 'Diperbarui',
     ],
 
     'filters' => [

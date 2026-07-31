@@ -3,6 +3,8 @@
 namespace Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages;
 
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Resources\Pages\EditRecord;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
@@ -14,8 +16,38 @@ class EditTopbarMenuItem extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            // Only with the page routed: a ViewAction without a view route
+            // falls back to a modal, which is not what disabling the page asks
+            // for. Same reasoning as the resource table's row action.
+            ...(TopbarMenuItemResource::hasViewPage() ? [ViewAction::make()] : []),
+
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * Filament leaves the admin on the edit form after saving. With the View
+     * page enabled, land on the record instead — the same page a create ends
+     * on (CreateRecord already redirects to `view` when the page exists), so
+     * both ways of writing an item finish in the same place.
+     *
+     * A panel that configured its own edit-page redirect keeps it: that is an
+     * explicit choice by the application, not a default this package may
+     * override.
+     */
+    protected function getRedirectUrl(): ?string
+    {
+        $resource = static::getResource();
+
+        if (
+            blank(Filament::getResourceEditPageRedirect())
+            && $resource::hasViewPage()
+            && $resource::canView($this->getRecord())
+        ) {
+            return $this->getResourceUrl('view', $this->getRedirectUrlParameters());
+        }
+
+        return parent::getRedirectUrl();
     }
 
     /**

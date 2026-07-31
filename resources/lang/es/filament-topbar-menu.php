@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Enlace',
         'appearance' => 'Apariencia y comportamiento',
+        'record' => 'Registro',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Visible para',
             'placeholder' => 'Todos',
             'helper' => 'La visibilidad por roles (la clave «roles») se conserva cuando se define directamente en el registro.',
+            'roles' => 'Restringido a roles',
             'options' => [
                 'auth' => 'Solo usuarios autenticados',
                 'guest' => 'Solo invitados',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Orden',
         'hidden_on_current_domain' => 'Oculto en este dominio',
         'hidden_on_current_domain_tooltip' => 'Oculto en este dominio; visible en los demás servicios de la flota.',
+        'resolved_url' => 'Enlace resuelto',
+        'created_at' => 'Creado',
+        'updated_at' => 'Actualizado',
     ],
 
     'filters' => [

@@ -6,6 +6,13 @@ use Filament\Resources\Pages\CreateRecord;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
+/**
+ * Where a save lands is not decided here: CreateRecord already redirects to
+ * the `view` page when the resource has one, so enabling
+ * `filament-topbar-menu.enable_view_page` is enough — and a panel that set its
+ * own create-page redirect keeps it. EditTopbarMenuItem has to say it out loud
+ * because Filament's default there is to stay on the form.
+ */
 class CreateTopbarMenuItem extends CreateRecord
 {
     protected static string $resource = TopbarMenuItemResource::class;

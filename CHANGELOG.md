@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **View page for a menu item.** A read-only page showing the item's link, the
+  URL it actually resolves to — generated for route items, empty for a broken
+  route name — the favicon-over-icon marker the topbar renders, every visibility
+  rule (including a `roles` restriction, which no form field owns and which the
+  panel therefore had no way to show before) and the timestamps, plus a View row
+  action in the items table and a
+  View button on the edit page. Creating an item and saving an edit both land
+  there instead of on the edit form, which is where Filament leaves you in
+  both cases without the page, while a panel that configured its own
+  `resourceCreatePageRedirect()` / `resourceEditPageRedirect()` keeps its
+  choice. The `{record}` route is registered after `create`, so `/create`
+  is not swallowed by it.
+
+  On by default; `FILAMENT_TOPBAR_MENU_VIEW_PAGE=false` (or
+  `'enable_view_page' => false`) keeps the plain list/create/edit resource,
+  with no View action rendered anywhere. The route only exists while the option
+  is on, so a panel with cached routes needs `route:cache` re-run after
+  flipping it — including on the update that brings this page in. Until it is
+  re-run the page reports itself unavailable rather than letting Filament
+  generate the URL of a route the router does not know: that would throw on the
+  items table and, because `CreateRecord` writes the record before building its
+  redirect, turn a successful create into a "failed" save that invites a
+  duplicate on retry. The check is deliberately skipped while the application is
+  still booting, because Laravel loads the cached route file from a `booted`
+  callback — asking the router during boot, when Filament registers each page's
+  Livewire component, would strip the page off a healthy cached deploy.
+
+- **The View page's strings in all 13 shipped locales.** Four new keys for the
+  page itself (`sections.record`, `columns.resolved_url`, `columns.created_at`,
+  `columns.updated_at`) and one for the roles row (`fields.visibility.roles`).
+
 ### Fixed
 
 - **The favicon of the linked page wins over the site-wide one.** The resolver

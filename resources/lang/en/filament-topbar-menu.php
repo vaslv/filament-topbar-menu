@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Link',
         'appearance' => 'Appearance & behavior',
+        'record' => 'Record',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Visible to',
             'placeholder' => 'Everyone',
             'helper' => 'Role-based visibility (the "roles" key) is preserved when set directly on the record.',
+            'roles' => 'Restricted to roles',
             'options' => [
                 'auth' => 'Authenticated users only',
                 'guest' => 'Guests only',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Sort',
         'hidden_on_current_domain' => 'Hidden on this domain',
         'hidden_on_current_domain_tooltip' => 'Hidden on this domain; still visible on the fleet\'s other services.',
+        'resolved_url' => 'Resolved link',
+        'created_at' => 'Created',
+        'updated_at' => 'Updated',
     ],
 
     'filters' => [

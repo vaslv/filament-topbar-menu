@@ -9,10 +9,14 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\KeyValueEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -27,6 +31,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Route;
+use Throwable;
 use UnitEnum;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
@@ -274,6 +279,198 @@ class TopbarMenuItemResource extends Resource
             ]);
     }
 
+    /**
+     * Whether the read-only View page is part of the resource — on by default,
+     * switched off with `filament-topbar-menu.enable_view_page` (the
+     * FILAMENT_TOPBAR_MENU_VIEW_PAGE env variable). It governs the `{record}`
+     * route, the View actions and the post-save landing page in one place, so
+     * a panel that turns it off never renders a link to a route that is not
+     * registered.
+     */
+    public static function hasViewPage(): bool
+    {
+        if (! (bool) config('filament-topbar-menu.enable_view_page', true)) {
+            return false;
+        }
+
+        // Route-cache skew, the one way this feature can 500 a production
+        // panel: the route comes from getPages() at boot, but an application
+        // that updates the package without re-running `route:cache` keeps a
+        // route collection that predates this page. Filament would still read
+        // hasPage('view') as true — through this method, through its own
+        // breadcrumbs, and through CreateRecord's redirect, which runs AFTER
+        // the record is written — and generating the URL of a route the router
+        // does not know throws. Answering from the router in that case degrades
+        // the feature to "no View page until the cache is rebuilt".
+        //
+        // Only once the application is booted, though: Laravel requires the
+        // cached route file from an `booted` callback, so during boot — which
+        // is when Filament reads getPages() to register the pages' Livewire
+        // components — the router is still empty and the check would strip the
+        // page off a perfectly healthy cached deploy.
+        if (! app()->routesAreCached() || ! app()->isBooted()) {
+            return true;
+        }
+
+        try {
+            return Route::has(static::getRouteBaseName().'.view');
+        } catch (Throwable) {
+            // No panel context (the resource inspected outside a panel, as this
+            // package's own unit tests do): nothing can link anywhere anyway.
+            return false;
+        }
+    }
+
+    /**
+     * The role names a record is restricted to, keeping only values that can
+     * actually be shown and matched — `roles` is written by an import or
+     * directly on the record, so the column can hold anything.
+     *
+     * @return list<string>
+     */
+    protected static function rolesOf(TopbarMenuItem $record): array
+    {
+        return array_values(array_filter(
+            (array) ($record->visibility['roles'] ?? []),
+            fn (mixed $role): bool => is_string($role) && $role !== '',
+        ));
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make(static::trans('sections.link'))
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('label')
+                            ->label(static::trans('fields.label')),
+
+                        TextEntry::make('parent.label')
+                            ->label(static::trans('columns.parent'))
+                            ->placeholder('—'),
+
+                        TextEntry::make('type')
+                            ->label(static::trans('fields.type.label'))
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => static::trans("fields.type.options.{$state}"))
+                            ->color(fn (string $state): string => $state === TopbarMenuItem::TYPE_ROUTE ? 'info' : 'gray'),
+
+                        TextEntry::make('target')
+                            ->label(static::trans('fields.target.label'))
+                            ->badge()
+                            ->color('gray')
+                            ->formatStateUsing(fn (string $state): string => static::trans('fields.target.options.'.($state === TopbarMenuItem::TARGET_BLANK ? 'blank' : 'self'))),
+
+                        TextEntry::make('url')
+                            ->label(static::trans('fields.url.label'))
+                            ->visible(fn (TopbarMenuItem $record): bool => $record->type === TopbarMenuItem::TYPE_URL)
+                            ->placeholder('—')
+                            ->columnSpanFull(),
+
+                        TextEntry::make('route')
+                            ->label(static::trans('fields.route.label'))
+                            ->visible(fn (TopbarMenuItem $record): bool => $record->type === TopbarMenuItem::TYPE_ROUTE)
+                            ->placeholder('—'),
+
+                        KeyValueEntry::make('route_parameters')
+                            ->keyLabel(static::trans('fields.route_parameters.key'))
+                            ->valueLabel(static::trans('fields.route_parameters.value'))
+                            ->visible(fn (TopbarMenuItem $record): bool => $record->type === TopbarMenuItem::TYPE_ROUTE
+                                && filled($record->route_parameters)),
+
+                        // What the topbar actually links to: a route item's URL
+                        // is generated, and a broken route name resolves to
+                        // null — the page is where an admin finds that out
+                        // instead of hunting for a missing item in the menu.
+                        TextEntry::make('resolved_url')
+                            ->label(static::trans('columns.resolved_url'))
+                            ->state(fn (TopbarMenuItem $record): ?string => $record->resolveUrl())
+                            ->placeholder('—')
+                            ->columnSpanFull(),
+                    ]),
+
+                Section::make(static::trans('sections.appearance'))
+                    ->columns(2)
+                    ->schema([
+                        // Same marker the topbar renders, resolved the same way
+                        // (favicon over icon) — see displayIcon(). As in the
+                        // table, displayIcon() has to be the entry's STATE:
+                        // IconEntry::toEmbeddedHtml() returns the placeholder
+                        // for a blank state before it ever calls ->icon().
+                        IconEntry::make('display_icon')
+                            ->label(static::trans('fields.icon.label'))
+                            ->state(fn (TopbarMenuItem $record): ?string => $record->displayIcon())
+                            ->icon(fn (?string $state): ?string => $state)
+                            ->placeholder('—'),
+
+                        TextEntry::make('favicon_url')
+                            ->label(static::trans('fields.favicon_url.label'))
+                            ->placeholder('—'),
+
+                        TextEntry::make('visibility_mode')
+                            ->label(static::trans('fields.visibility.label'))
+                            ->state(fn (TopbarMenuItem $record): ?string => TopbarMenuItem::visibilityModeFromArray($record->visibility))
+                            ->formatStateUsing(fn (string $state): string => static::trans("fields.visibility.options.{$state}"))
+                            // No mode stored means "everyone" — the same word
+                            // the form's placeholder uses. Except when roles
+                            // restrict the item: the mode ignores that key, so
+                            // saying "Everyone" here would contradict the roles
+                            // entry right below and overstate who sees the item.
+                            ->placeholder(fn (TopbarMenuItem $record): string => static::rolesOf($record) === []
+                                ? static::trans('fields.visibility.placeholder')
+                                : '—'),
+
+                        // The audience above only knows auth/guest, so without
+                        // this entry a role-restricted item reads as "Everyone"
+                        // — the page would understate who can see it. `roles` is
+                        // set through an import or directly on the record (the
+                        // form deliberately does not manage it), which is
+                        // exactly why the read-only page has to surface it.
+                        TextEntry::make('visibility_roles')
+                            ->label(static::trans('fields.visibility.roles'))
+                            ->state(fn (TopbarMenuItem $record): array => static::rolesOf($record))
+                            ->badge()
+                            // Same list decides both, or a record whose stored
+                            // roles are all unusable would show the label over
+                            // an empty row.
+                            ->visible(fn (TopbarMenuItem $record): bool => static::rolesOf($record) !== []),
+
+                        // Read the stored key the way the edit form fills it —
+                        // route items included. The rule only applies to URL
+                        // items, so the entry is hidden for route ones rather
+                        // than reporting an invented "no" over a stored "yes"
+                        // that a type switch would bring back.
+                        IconEntry::make('visibility_hide_on_current_domain')
+                            ->label(static::trans('fields.hide_on_current_domain.label'))
+                            ->visible(fn (TopbarMenuItem $record): bool => $record->type === TopbarMenuItem::TYPE_URL)
+                            ->state(fn (TopbarMenuItem $record): bool => ($record->visibility['hide_on_current_domain'] ?? false) === true)
+                            ->boolean(),
+
+                        TextEntry::make('sort')
+                            ->label(static::trans('fields.sort.label')),
+
+                        IconEntry::make('is_active')
+                            ->label(static::trans('fields.is_active.label'))
+                            ->boolean(),
+                    ]),
+
+                Section::make(static::trans('sections.record'))
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('created_at')
+                            ->label(static::trans('columns.created_at'))
+                            ->dateTime()
+                            ->placeholder('—'),
+
+                        TextEntry::make('updated_at')
+                            ->label(static::trans('columns.updated_at'))
+                            ->dateTime()
+                            ->placeholder('—'),
+                    ]),
+            ]);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -390,6 +587,11 @@ class TopbarMenuItemResource extends Resource
                             ->send();
                     }),
 
+                // Added, not merely hidden, when the page is off: a ViewAction
+                // without a view route falls back to a modal, which is not the
+                // opt-out an admin asked for by disabling the page.
+                ...(static::hasViewPage() ? [ViewAction::make()] : []),
+
                 EditAction::make(),
                 DeleteAction::make(),
             ])
@@ -429,10 +631,21 @@ class TopbarMenuItemResource extends Resource
 
     public static function getPages(): array
     {
-        return [
+        $pages = [
             'index' => Pages\ListTopbarMenuItems::route('/'),
             'create' => Pages\CreateTopbarMenuItem::route('/create'),
-            'edit' => Pages\EditTopbarMenuItem::route('/{record}/edit'),
         ];
+
+        // Registered after `create` on purpose: `/{record}` would otherwise
+        // match `/create` first and swallow the create page. Filament reads
+        // this array to decide the post-save redirect and the View action's
+        // URL, so the whole feature hangs off this one conditional.
+        if (static::hasViewPage()) {
+            $pages['view'] = Pages\ViewTopbarMenuItem::route('/{record}');
+        }
+
+        $pages['edit'] = Pages\EditTopbarMenuItem::route('/{record}/edit');
+
+        return $pages;
     }
 }

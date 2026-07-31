@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Link',
         'appearance' => 'Aparência e comportamento',
+        'record' => 'Registro',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Visível para',
             'placeholder' => 'Todos',
             'helper' => 'A visibilidade baseada em papéis (chave "roles") é preservada quando definida diretamente no registro.',
+            'roles' => 'Restrito a papéis',
             'options' => [
                 'auth' => 'Apenas usuários autenticados',
                 'guest' => 'Apenas visitantes',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Ordem',
         'hidden_on_current_domain' => 'Oculto neste domínio',
         'hidden_on_current_domain_tooltip' => 'Oculto neste domínio; visível nos demais serviços da frota.',
+        'resolved_url' => 'Link resolvido',
+        'created_at' => 'Criado em',
+        'updated_at' => 'Atualizado em',
     ],
 
     'filters' => [

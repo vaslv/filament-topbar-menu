@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Lien',
         'appearance' => 'Apparence et comportement',
+        'record' => 'Enregistrement',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Visible par',
             'placeholder' => 'Tout le monde',
             'helper' => 'La visibilité par rôles (la clé « roles ») est conservée lorsqu\'elle est définie directement sur l\'enregistrement.',
+            'roles' => 'Limité aux rôles',
             'options' => [
                 'auth' => 'Utilisateurs authentifiés uniquement',
                 'guest' => 'Invités uniquement',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Ordre',
         'hidden_on_current_domain' => 'Masqué sur ce domaine',
         'hidden_on_current_domain_tooltip' => 'Masqué sur ce domaine ; visible sur les autres services de la flotte.',
+        'resolved_url' => 'Lien résolu',
+        'created_at' => 'Créé le',
+        'updated_at' => 'Modifié le',
     ],
 
     'filters' => [

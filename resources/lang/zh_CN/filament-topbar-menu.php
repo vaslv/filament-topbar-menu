@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => '链接',
         'appearance' => '外观与行为',
+        'record' => '记录',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => '可见范围',
             'placeholder' => '所有人',
             'helper' => '基于角色的可见性（"roles" 键）在直接设置于记录上时会被保留。',
+            'roles' => '限定角色',
             'options' => [
                 'auth' => '仅登录用户',
                 'guest' => '仅访客',
@@ -83,6 +85,9 @@ return [
         'sort' => '排序',
         'hidden_on_current_domain' => '已在此域名下隐藏',
         'hidden_on_current_domain_tooltip' => '已在此域名下隐藏；在其他服务上仍然可见。',
+        'resolved_url' => '解析后的链接',
+        'created_at' => '创建时间',
+        'updated_at' => '更新时间',
     ],
 
     'filters' => [

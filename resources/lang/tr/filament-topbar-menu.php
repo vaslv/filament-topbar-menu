@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Bağlantı',
         'appearance' => 'Görünüm ve davranış',
+        'record' => 'Kayıt',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Kimlere görünür',
             'placeholder' => 'Herkes',
             'helper' => 'Rol tabanlı görünürlük ("roles" anahtarı), doğrudan kayıt üzerinde ayarlandığında korunur.',
+            'roles' => 'Rollerle sınırlı',
             'options' => [
                 'auth' => 'Yalnızca oturum açmış kullanıcılar',
                 'guest' => 'Yalnızca ziyaretçiler',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Sıralama',
         'hidden_on_current_domain' => 'Bu alan adında gizli',
         'hidden_on_current_domain_tooltip' => 'Bu alan adında gizli; filonun diğer servislerinde görünür.',
+        'resolved_url' => 'Çözümlenen bağlantı',
+        'created_at' => 'Oluşturulma',
+        'updated_at' => 'Güncellenme',
     ],
 
     'filters' => [

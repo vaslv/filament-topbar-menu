@@ -71,6 +71,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | View page
+    |--------------------------------------------------------------------------
+    |
+    | The read-only "View" page of a menu item: the resource gets a `{record}`
+    | route, the items table gets a View row action, and both creating an item
+    | and saving an edit land on that page instead of the edit form — where
+    | Filament otherwise leaves you in both cases. Enabled by default.
+    |
+    | The landing page is not forced: a panel that configured its own
+    | `resourceCreatePageRedirect()` / `resourceEditPageRedirect()` keeps that
+    | choice, and a user the view policy denies is never redirected there.
+    |
+    | Turn it off with FILAMENT_TOPBAR_MENU_VIEW_PAGE=false to keep the plain
+    | list/create/edit resource — no route, no View action anywhere.
+    |
+    | The route is only registered while this is enabled, so a panel whose
+    | routes are cached must be re-cached (`php artisan route:cache`) after
+    | flipping it — and after the update that first brings the page in. Until
+    | then the package sees that the cached route collection has no View route
+    | and reports the page as unavailable, so a stale cache costs the View
+    | button rather than throwing on a URL it cannot generate.
+    |
+    */
+
+    'enable_view_page' => env('FILAMENT_TOPBAR_MENU_VIEW_PAGE', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | External links
     |--------------------------------------------------------------------------
     |

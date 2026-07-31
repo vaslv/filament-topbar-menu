@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'الرابط',
         'appearance' => 'المظهر والسلوك',
+        'record' => 'السجل',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'مرئي لـ',
             'placeholder' => 'الجميع',
             'helper' => 'يتم الحفاظ على الرؤية حسب الأدوار (مفتاح "roles") عند تعيينها مباشرة على السجل.',
+            'roles' => 'مقيَّد بأدوار',
             'options' => [
                 'auth' => 'المستخدمون المسجّلون فقط',
                 'guest' => 'الزوار فقط',
@@ -83,6 +85,9 @@ return [
         'sort' => 'الترتيب',
         'hidden_on_current_domain' => 'مخفي على هذا النطاق',
         'hidden_on_current_domain_tooltip' => 'مخفي على هذا النطاق؛ ويظهر على بقية خدمات الأسطول.',
+        'resolved_url' => 'الرابط النهائي',
+        'created_at' => 'تاريخ الإنشاء',
+        'updated_at' => 'تاريخ التحديث',
     ],
 
     'filters' => [

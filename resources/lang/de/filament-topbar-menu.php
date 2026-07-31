@@ -11,6 +11,7 @@ return [
     'sections' => [
         'link' => 'Link',
         'appearance' => 'Darstellung & Verhalten',
+        'record' => 'Datensatz',
     ],
 
     'fields' => [
@@ -57,6 +58,7 @@ return [
             'label' => 'Sichtbar für',
             'placeholder' => 'Alle',
             'helper' => 'Rollenbasierte Sichtbarkeit (der Schlüssel „roles“) bleibt erhalten, wenn sie direkt am Datensatz gesetzt ist.',
+            'roles' => 'Auf Rollen beschränkt',
             'options' => [
                 'auth' => 'Nur angemeldete Benutzer',
                 'guest' => 'Nur Gäste',
@@ -83,6 +85,9 @@ return [
         'sort' => 'Sortierung',
         'hidden_on_current_domain' => 'Auf dieser Domain ausgeblendet',
         'hidden_on_current_domain_tooltip' => 'Auf dieser Domain ausgeblendet; auf den übrigen Diensten der Flotte sichtbar.',
+        'resolved_url' => 'Aufgelöster Link',
+        'created_at' => 'Erstellt',
+        'updated_at' => 'Aktualisiert',
     ],
 
     'filters' => [

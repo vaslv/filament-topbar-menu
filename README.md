@@ -99,6 +99,37 @@ Menu items live in the `filament_topbar_menu_items` table and are managed throug
 - **Active** toggle and **sort** order (rows can also be reordered by drag & drop)
 - **Visibility** — everyone, authenticated users only, or guests only
 
+### View page
+
+Each item has a read-only **View** page — the link it resolves to, the marker
+the topbar renders, every visibility rule (audience, a `roles` restriction, "hide
+on its own domain") and the timestamps. The items table gets a **View** row
+action, the edit page a View button, and both creating and saving an item land on
+that page instead of the edit form (where Filament leaves you in both cases
+without it).
+
+The page is the only place a `roles` restriction is visible in the panel: the
+form deliberately does not manage that key, so an item restricted to roles by an
+import or a direct write shows its roles here instead of quietly reading as
+*Everyone*.
+
+Turn it off to keep the plain list / create / edit resource:
+
+```dotenv
+FILAMENT_TOPBAR_MENU_VIEW_PAGE=false
+```
+
+or `'enable_view_page' => false` in the config. Off, no View action is rendered
+anywhere and saving lands where Filament puts it by default.
+
+The route is registered only while the option is on, so re-run
+`php artisan route:cache` after flipping it — and after the update that first
+brings the page in — if your panel caches routes. Until you do, the package
+notices that the cached route collection has no View route and reports the page
+as unavailable, so a stale cache costs you the View button rather than a
+`RouteNotFoundException`. A panel that configured its own
+`resourceCreatePageRedirect()` / `resourceEditPageRedirect()` keeps its choice.
+
 ### Demo data
 
 To try the menu out quickly, seed a demo tree that exercises every feature —
@@ -198,6 +229,11 @@ The `visibility` JSON column supports:
 
 Visibility is evaluated per request — it is never baked into the cache.
 
+The form manages the audience (`auth`/`guest`) and the domain rule; `roles` is
+set through an import or directly on the record and is preserved by every save.
+The View page shows all of them, so a role restriction stays visible in the panel
+even though no form field owns it.
+
 ## Export & import
 
 The list page has **Export** and **Import** header actions for moving the whole
@@ -278,6 +314,11 @@ return [
     'cache_ttl' => 3600,
     'enable_favicons' => true,
     'favicon_request_timeout' => 5,
+    // The resource's read-only View page: a `{record}` route, a View row
+    // action, and create/edit saves landing on that page (see "View page"
+    // above). Set FILAMENT_TOPBAR_MENU_VIEW_PAGE=false for a plain
+    // list/create/edit resource.
+    'enable_view_page' => env('FILAMENT_TOPBAR_MENU_VIEW_PAGE', true),
     // Default value of the target field for new items. The per-item choice
     // ("Same tab" / "New tab") always wins at render time; this is only a default.
     'open_external_links_in_new_tab' => true,
