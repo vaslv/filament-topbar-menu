@@ -5,7 +5,22 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0]
+
+### Added
+
+- **A "Flush menu cache" action on the items page**, beside Export and Import.
+  Every write through this package already flushes the cached snapshot — the
+  model hooks, the import, the reorder callback — so this is for the writes
+  outside its reach: a row written by a sibling app on a shared menu database, a
+  seeder, hand-written SQL, or a cache store restored from a backup. Until now
+  those needed console access to `TopbarMenu::flushCache()`. Nothing is lost by
+  pressing it, since the next render rebuilds the snapshot from the database.
+  Shown to users the resource's *viewAny* policy allows — the snapshot is shared
+  by every visitor of every panel — and hidden while the menu table is missing,
+  where the setup action is the only one on offer and flushing would trade a
+  stale menu for an empty one. Two new keys, `actions.flush_cache` and
+  `notifications.cache_flushed`, in all 13 shipped locales.
 
 ### Fixed
 

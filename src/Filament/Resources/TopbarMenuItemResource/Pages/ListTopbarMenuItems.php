@@ -18,6 +18,7 @@ use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 use Vaslv\FilamentTopbarMenu\Support\MenuTableSchema;
 use Vaslv\FilamentTopbarMenu\Support\MenuTransfer;
+use Vaslv\FilamentTopbarMenu\TopbarMenu;
 
 class ListTopbarMenuItems extends ListRecords
 {
@@ -35,6 +36,7 @@ class ListTopbarMenuItems extends ListRecords
             $this->setupTableAction(),
             $this->exportAction(),
             $this->importAction(),
+            $this->flushCacheAction(),
             CreateAction::make()
                 ->visible(fn (): bool => ! $this->menuTableIsMissing()),
         ];
@@ -149,6 +151,39 @@ class ListTopbarMenuItems extends ListRecords
     protected function menuTableIsMissing(): bool
     {
         return $this->menuTableIsMissing ??= ! app(MenuTableSchema::class)->exists();
+    }
+
+    /**
+     * Drop the cached menu snapshot.
+     *
+     * Every write through this package already flushes it — the model's saved
+     * and deleted hooks, the import, the reorder callback. This action is for
+     * the cases outside that reach: a row written by a sibling app on a shared
+     * menu database, a seeder, hand-written SQL, or a cache store that was
+     * restored from elsewhere. Nothing is lost by pressing it: the next render
+     * rebuilds the snapshot from the database.
+     *
+     * Hidden while the menu table is missing, where the setup action is the
+     * only thing on offer — flushing there would only trade a stale menu for an
+     * empty one, and the table has to exist before either is worth anything.
+     */
+    protected function flushCacheAction(): Action
+    {
+        return Action::make('flushCache')
+            ->label($this->trans('actions.flush_cache'))
+            ->icon('heroicon-m-arrow-path')
+            ->color('gray')
+            // The snapshot is shared by every visitor of every panel, so ask
+            // for the same gate export needs to read the menu at all.
+            ->visible(fn (): bool => ! $this->menuTableIsMissing() && TopbarMenuItemResource::canViewAny())
+            ->action(function (): void {
+                app(TopbarMenu::class)->flushCache();
+
+                Notification::make()
+                    ->title($this->trans('notifications.cache_flushed'))
+                    ->success()
+                    ->send();
+            });
     }
 
     protected function exportAction(): Action

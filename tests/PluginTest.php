@@ -123,7 +123,7 @@ class PluginTest extends TestCase
         $this->assertSame('sort', $table->getReorderColumn());
     }
 
-    public function test_the_list_page_defines_export_import_and_create_header_actions(): void
+    public function test_the_list_page_defines_export_import_flush_and_create_header_actions(): void
     {
         $this->app->setLocale('en');
 
@@ -132,14 +132,34 @@ class PluginTest extends TestCase
         $actions = (new ReflectionMethod($page, 'getHeaderActions'))->invoke($page);
 
         $this->assertSame(
-            ['setupTable', 'export', 'import', 'create'],
+            ['setupTable', 'export', 'import', 'flushCache', 'create'],
             array_map(fn ($action) => $action->getName(), $actions),
         );
 
-        [, $export, $import] = $actions;
+        [, $export, $import, $flushCache] = $actions;
 
         $this->assertSame('Export', $export->getLabel());
         $this->assertSame('Import', $import->getLabel());
+        $this->assertSame('Flush menu cache', $flushCache->getLabel());
+    }
+
+    public function test_the_header_action_flushes_the_menu_cache(): void
+    {
+        TopbarMenuItem::create(['label' => 'A', 'type' => 'url', 'url' => '/a']);
+
+        app(TopbarMenu::class)->items();
+
+        $this->assertTrue(Cache::has(app(TopbarMenu::class)->cacheKey()));
+
+        $page = new Pages\ListTopbarMenuItems;
+
+        $action = (new ReflectionMethod($page, 'flushCacheAction'))->invoke($page);
+
+        // The action's own callback, not flushCache() directly — what is being
+        // asserted is that pressing the button reaches the cache at all.
+        $action->call();
+
+        $this->assertFalse(Cache::has(app(TopbarMenu::class)->cacheKey()));
     }
 
     public function test_drag_and_drop_reordering_flushes_the_menu_cache(): void

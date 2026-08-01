@@ -102,6 +102,7 @@ return [
         'export' => 'Экспорт',
         'import' => 'Импорт',
         'create_table' => 'Создать таблицу меню',
+        'flush_cache' => 'Сбросить кэш меню',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => 'Определено фавиконов: :count',
         'import_success' => 'Импортировано пунктов меню: :count',
         'import_invalid' => 'Файл не является корректным экспортом меню',
+        'cache_flushed' => 'Кэш меню сброшен',
         'table_created' => 'Таблица меню создана',
         'table_copied' => 'Скопировано :count пунктов меню с соединения по умолчанию',
     ],

@@ -102,6 +102,7 @@ return [
         'export' => '导出',
         'import' => '导入',
         'create_table' => '创建菜单表',
+        'flush_cache' => '清除菜单缓存',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => '已解析 :count 个网站图标',
         'import_success' => '已导入 :count 个菜单项',
         'import_invalid' => '该文件不是有效的顶栏菜单导出文件',
+        'cache_flushed' => '菜单缓存已清除',
         'table_created' => '菜单表已创建',
         'table_copied' => '已从默认连接复制 :count 个菜单项',
     ],

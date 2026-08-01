@@ -102,6 +102,7 @@ return [
         'export' => 'Dışa aktar',
         'import' => 'İçe aktar',
         'create_table' => 'Menü tablosunu oluştur',
+        'flush_cache' => 'Menü önbelleğini temizle',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count favicon çözümlendi',
         'import_success' => ':count menü öğesi içe aktarıldı',
         'import_invalid' => 'Dosya geçerli bir üst menü dışa aktarımı değil',
+        'cache_flushed' => 'Menü önbelleği temizlendi',
         'table_created' => 'Menü tablosu oluşturuldu',
         'table_copied' => 'Varsayılan bağlantıdan :count menü öğesi kopyalandı',
     ],

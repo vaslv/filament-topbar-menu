@@ -102,6 +102,7 @@ return [
         'export' => 'برون‌بری',
         'import' => 'درون‌ریزی',
         'create_table' => 'ایجاد جدول منو',
+        'flush_cache' => 'پاک‌سازی حافظهٔ نهان منو',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count فاوآیکون تشخیص داده شد',
         'import_success' => ':count آیتم منو درون‌ریزی شد',
         'import_invalid' => 'این فایل یک برون‌بری معتبر از منوی نوار بالا نیست',
+        'cache_flushed' => 'حافظهٔ نهان منو پاک شد',
         'table_created' => 'جدول منو ایجاد شد',
         'table_copied' => ':count آیتم منو از اتصال پیش‌فرض کپی شد',
     ],

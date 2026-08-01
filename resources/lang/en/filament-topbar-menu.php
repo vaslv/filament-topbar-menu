@@ -102,6 +102,7 @@ return [
         'export' => 'Export',
         'import' => 'Import',
         'create_table' => 'Create menu table',
+        'flush_cache' => 'Flush menu cache',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count favicon(s) resolved',
         'import_success' => ':count menu item(s) imported',
         'import_invalid' => 'The file is not a valid topbar menu export',
+        'cache_flushed' => 'Menu cache flushed',
         'table_created' => 'Menu table created',
         'table_copied' => ':count menu item(s) copied from the default connection',
     ],

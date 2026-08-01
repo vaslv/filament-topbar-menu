@@ -102,6 +102,7 @@ return [
         'export' => 'Ekspor',
         'import' => 'Impor',
         'create_table' => 'Buat tabel menu',
+        'flush_cache' => 'Bersihkan cache menu',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count favicon berhasil ditentukan',
         'import_success' => ':count item menu diimpor',
         'import_invalid' => 'File ini bukan ekspor menu bilah atas yang valid',
+        'cache_flushed' => 'Cache menu dibersihkan',
         'table_created' => 'Tabel menu dibuat',
         'table_copied' => ':count item menu disalin dari koneksi bawaan',
     ],

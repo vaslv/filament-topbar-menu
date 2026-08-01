@@ -102,6 +102,7 @@ return [
         'export' => 'Exportar',
         'import' => 'Importar',
         'create_table' => 'Crear tabla del menú',
+        'flush_cache' => 'Vaciar la caché del menú',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count favicon(s) resuelto(s)',
         'import_success' => ':count elemento(s) de menú importado(s)',
         'import_invalid' => 'El archivo no es una exportación de menú válida',
+        'cache_flushed' => 'Caché del menú vaciada',
         'table_created' => 'Tabla del menú creada',
         'table_copied' => ':count elemento(s) del menú copiado(s) desde la conexión predeterminada',
     ],

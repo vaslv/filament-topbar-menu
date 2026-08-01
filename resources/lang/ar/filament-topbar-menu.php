@@ -102,6 +102,7 @@ return [
         'export' => 'تصدير',
         'import' => 'استيراد',
         'create_table' => 'إنشاء جدول القائمة',
+        'flush_cache' => 'مسح ذاكرة القائمة المؤقتة',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => 'تم تحديد :count من أيقونات المواقع',
         'import_success' => 'تم استيراد :count من عناصر القائمة',
         'import_invalid' => 'الملف ليس تصديراً صالحاً لقائمة الشريط العلوي',
+        'cache_flushed' => 'تم مسح ذاكرة القائمة المؤقتة',
         'table_created' => 'تم إنشاء جدول القائمة',
         'table_copied' => 'تم نسخ :count من عناصر القائمة من الاتصال الافتراضي',
     ],

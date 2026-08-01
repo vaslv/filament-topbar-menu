@@ -585,7 +585,15 @@ not a security boundary, and grants no access either way.
 
 ## Caching
 
-The menu tree is cached under `cache_key` for `cache_ttl` seconds, so rendering the topbar performs **zero database queries**. The cache is flushed automatically whenever an item is created, updated, deleted, or reordered. To flush it manually:
+The menu tree is cached under `cache_key` for `cache_ttl` seconds, so rendering the topbar performs **zero database queries**. The cache is flushed automatically whenever an item is created, updated, deleted, or reordered, and by an import.
+
+The **"Flush menu cache"** header action on the items page (next to Export and
+Import) does it from the panel. It is there for the writes outside this
+package's reach — a row written by a sibling app on a shared menu database, a
+seeder, hand-written SQL, a cache store restored from a backup. Pressing it
+costs nothing: the next render rebuilds the snapshot from the database.
+
+From code:
 
 ```php
 use Vaslv\FilamentTopbarMenu\Facades\TopbarMenu;

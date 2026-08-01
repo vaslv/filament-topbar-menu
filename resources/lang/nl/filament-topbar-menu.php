@@ -102,6 +102,7 @@ return [
         'export' => 'Exporteren',
         'import' => 'Importeren',
         'create_table' => 'Menutabel aanmaken',
+        'flush_cache' => 'Menucache legen',
     ],
 
     'missing_table' => [
@@ -123,6 +124,7 @@ return [
         'favicons_resolved' => ':count favicon(s) gevonden',
         'import_success' => ':count menu-item(s) geïmporteerd',
         'import_invalid' => 'Het bestand is geen geldige export van het topbalkmenu',
+        'cache_flushed' => 'Menucache geleegd',
         'table_created' => 'Menutabel aangemaakt',
         'table_copied' => ':count menu-item(s) gekopieerd van de standaardverbinding',
     ],
