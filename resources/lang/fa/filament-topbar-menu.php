@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'فاوآیکون تشخیص داده شد',
-        'favicon_updated' => 'فاوآیکون به‌روزرسانی شد',
         'favicon_not_found' => 'فاوآیکونی یافت نشد',
         'enter_url_first' => 'ابتدا یک URL خارجی وارد کنید',
         'favicons_resolved' => ':count فاوآیکون تشخیص داده شد',

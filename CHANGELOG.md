@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer — and none at all for a link to the host root, where the two
   candidates coincide.
 
+### Removed
+
+- **The per-row "Fetch favicon" action in the items table.** Resolving a single
+  item stays where that item is being worked on — the suffix button on the
+  Favicon URL field — and the table keeps the bulk action for a selection. The
+  row action put a third copy of the same operation on every row of a page whose
+  job is the overview. Its now-unused `notifications.favicon_updated` string is
+  dropped from all 13 locales; the bulk action and the field button keep their
+  own (`favicons_resolved`, `favicon_resolved`, `favicon_not_found`). The artisan
+  command is unchanged, and remains the way to re-resolve without clicking.
+
 ## [1.9.0]
 
 ### Added

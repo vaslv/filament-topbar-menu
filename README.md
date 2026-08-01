@@ -368,7 +368,7 @@ reachable URL.
 Ways to resolve favicons:
 
 - The **"Fetch favicon" suffix button** on the Favicon URL field in the create/edit form.
-- The **"Fetch favicon" row action** and the **bulk action** in the items table.
+- The **"Fetch favicons" bulk action** in the items table, for the rows you select.
 - The artisan command:
 
 ```bash

@@ -559,33 +559,11 @@ class TopbarMenuItemResource extends Resource
                     ->label(static::trans('filters.is_active')),
             ])
             ->recordActions([
-                Action::make('refreshFavicon')
-                    ->label(static::trans('actions.fetch_favicon'))
-                    ->icon('heroicon-m-arrow-path')
-                    ->visible(
-                        fn (TopbarMenuItem $record): bool => config('filament-topbar-menu.enable_favicons', true)
-                            && $record->type === TopbarMenuItem::TYPE_URL
-                            && filled($record->url),
-                    )
-                    ->action(function (TopbarMenuItem $record): void {
-                        $favicon = app(FaviconResolver::class)->resolve($record->url);
-
-                        if ($favicon === null) {
-                            Notification::make()
-                                ->title(static::trans('notifications.favicon_not_found'))
-                                ->warning()
-                                ->send();
-
-                            return;
-                        }
-
-                        $record->forceFill(['favicon_url' => $favicon])->save();
-
-                        Notification::make()
-                            ->title(static::trans('notifications.favicon_updated'))
-                            ->success()
-                            ->send();
-                    }),
+                // No per-row "Fetch favicon" here on purpose: resolving one item
+                // is offered where the item is being worked on — the suffix
+                // button on the Favicon URL field — and the table keeps only the
+                // bulk action, for a selection. A row action would repeat one of
+                // them on every row of a page whose job is the overview.
 
                 // Added, not merely hidden, when the page is off: a ViewAction
                 // without a view route falls back to a modal, which is not the

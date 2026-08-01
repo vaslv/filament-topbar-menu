@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => '网站图标已解析',
-        'favicon_updated' => '网站图标已更新',
         'favicon_not_found' => '未找到网站图标',
         'enter_url_first' => '请先输入外部 URL',
         'favicons_resolved' => '已解析 :count 个网站图标',

@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'تم تحديد أيقونة الموقع',
-        'favicon_updated' => 'تم تحديث أيقونة الموقع',
         'favicon_not_found' => 'لم يتم العثور على أيقونة الموقع',
         'enter_url_first' => 'أدخل رابطاً خارجياً أولاً',
         'favicons_resolved' => 'تم تحديد :count من أيقونات المواقع',

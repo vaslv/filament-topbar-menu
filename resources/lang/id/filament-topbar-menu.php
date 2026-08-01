@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon berhasil ditentukan',
-        'favicon_updated' => 'Favicon diperbarui',
         'favicon_not_found' => 'Favicon tidak ditemukan',
         'enter_url_first' => 'Masukkan URL eksternal terlebih dahulu',
         'favicons_resolved' => ':count favicon berhasil ditentukan',

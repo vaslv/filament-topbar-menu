@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon gevonden',
-        'favicon_updated' => 'Favicon bijgewerkt',
         'favicon_not_found' => 'Geen favicon gevonden',
         'enter_url_first' => 'Voer eerst een externe URL in',
         'favicons_resolved' => ':count favicon(s) gevonden',

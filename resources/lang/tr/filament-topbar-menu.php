@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon çözümlendi',
-        'favicon_updated' => 'Favicon güncellendi',
         'favicon_not_found' => 'Favicon bulunamadı',
         'enter_url_first' => 'Önce harici bir URL girin',
         'favicons_resolved' => ':count favicon çözümlendi',

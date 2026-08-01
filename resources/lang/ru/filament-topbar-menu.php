@@ -118,7 +118,6 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Фавикон определён',
-        'favicon_updated' => 'Фавикон обновлён',
         'favicon_not_found' => 'Фавикон не найден',
         'enter_url_first' => 'Сначала укажите внешний URL',
         'favicons_resolved' => 'Определено фавиконов: :count',
