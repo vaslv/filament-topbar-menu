@@ -5,6 +5,26 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1]
+
+### Security
+
+- **An IPv4 address wrapped in an IPv6 one no longer slips past the favicon
+  resolver's SSRF guard on PHP 8.2.** The guard asks `filter_var()` whether an
+  address is outside the private and reserved ranges, and on PHP 8.2 that
+  question is answered wrong for the wrapped forms: `::ffff:127.0.0.1` (and its
+  `::ffff:7f00:1` spelling), `::ffff:10.0.0.1` and the deprecated
+  `::127.0.0.1` are all reported public, so a menu item pointing at one of them
+  reached loopback or the private network. PHP 8.3 added `::ffff:0:0/96` to its
+  reserved list, which is why the hole existed only on the oldest supported
+  runtime — and why the test suite caught it only in CI. The guard now reduces
+  such an address to the IPv4 one it carries before judging it, on every
+  version.
+- **The NAT64 well-known prefix is refused**, on every PHP version. Where a
+  NAT64 gateway is on the path — IPv6-only networks routinely have one —
+  `64:ff9b::7f00:1` is how a host reaches 127.0.0.1, and no PHP release
+  classifies that range as reserved.
+
 ## [1.10.0]
 
 ### Added

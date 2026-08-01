@@ -368,9 +368,11 @@ URL into the Favicon URL field by hand for those items.
 The resolver also treats every linked site as untrusted and **refuses to fetch
 private, loopback, link-local and reserved addresses** (including cloud metadata
 endpoints), re-checking every redirect hop and every numeric spelling of an
-address. A menu item pointing at an internal-only host therefore never gets an
-auto-resolved favicon: fill the field by hand, or serve the icon from a publicly
-reachable URL.
+address — including the IPv4 addresses that hide inside an IPv6 one
+(`::ffff:127.0.0.1`, `::127.0.0.1`, the NAT64 `64:ff9b::7f00:1`). A menu item
+pointing at an internal-only host therefore never gets an auto-resolved
+favicon: fill the field by hand, or serve the icon from a publicly reachable
+URL.
 
 Ways to resolve favicons:
 

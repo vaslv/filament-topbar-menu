@@ -238,9 +238,44 @@ class FaviconResolverTest extends TestCase
         // address part has to be checked on its own.
         $this->assertNull($resolver->resolve('http://[fe80::1%25en0]/'));
         $this->assertNull($resolver->resolve('http://[fe80::1]/'));
-        $this->assertNull($resolver->resolve('http://[::ffff:127.0.0.1]/'));
 
         Http::assertNothingSent();
+    }
+
+    public function test_an_ipv4_address_wrapped_in_an_ipv6_one_is_refused(): void
+    {
+        Http::fake();
+
+        $resolver = app(FaviconResolver::class);
+
+        // The range flags do not see through the wrapper on every runtime this
+        // package supports: on PHP 8.2 filter_var() calls all three of these
+        // public, so the guard has to reduce them to the address the packet
+        // actually reaches. Both spellings of the mapped form, plus the
+        // deprecated IPv4-compatible one.
+        $this->assertNull($resolver->resolve('http://[::ffff:127.0.0.1]/'));
+        $this->assertNull($resolver->resolve('http://[::ffff:7f00:1]/'));
+        $this->assertNull($resolver->resolve('http://[::ffff:10.0.0.1]/'));
+        $this->assertNull($resolver->resolve('http://[::127.0.0.1]/'));
+
+        // NAT64: on a network with such a gateway this is how a host reaches
+        // 127.0.0.1 over IPv6, and no PHP version rejects it on its own.
+        $this->assertNull($resolver->resolve('http://[64:ff9b::7f00:1]/'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_public_ipv6_literal_is_still_reachable(): void
+    {
+        Http::fake([
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // Unwrapping the embedded-IPv4 forms must not turn into refusing IPv6
+        // literals at large: an ordinary global-unicast address is fetched.
+        $this->assertNull(app(FaviconResolver::class)->resolve('http://[2606:4700::1]/'));
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '2606:4700'));
     }
 
     public function test_a_unicode_host_name_is_still_reachable(): void

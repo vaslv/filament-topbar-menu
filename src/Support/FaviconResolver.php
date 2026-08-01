@@ -479,10 +479,52 @@ class FaviconResolver
     protected function ipIsPublic(string $ip): bool
     {
         return filter_var(
-            $ip,
+            $this->unwrapEmbeddedIpv4($ip),
             FILTER_VALIDATE_IP,
             FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
         ) !== false;
+    }
+
+    /**
+     * Reduce an IPv6 address that carries an IPv4 one inside it to that IPv4
+     * address, so the range flags judge what the packet actually reaches.
+     *
+     * They cannot be trusted to do it themselves. On PHP 8.2 — a version this
+     * package supports — `filter_var('::ffff:127.0.0.1', FILTER_VALIDATE_IP,
+     * FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)` returns the
+     * address, calling loopback public; `::ffff:10.0.0.1` and the deprecated
+     * `::127.0.0.1` form pass the same way. PHP 8.3 added `::ffff:0:0/96` to
+     * its reserved list and closed that, which is why the hole is invisible on
+     * a newer runtime. Unwrapping here fixes 8.2 and leaves 8.3+ unchanged.
+     *
+     * The NAT64 well-known prefix is handled too, and that one is open on every
+     * version: on a network with a NAT64 gateway, `64:ff9b::7f00:1` is how a
+     * host reaches 127.0.0.1 over IPv6.
+     *
+     * `::` and `::1` fall out of the IPv4-compatible branch as `0.0.0.0` and
+     * `0.0.0.1`, both inside the reserved `0.0.0.0/8` — still refused.
+     */
+    protected function unwrapEmbeddedIpv4(string $ip): string
+    {
+        $packed = @inet_pton($ip);
+
+        if ($packed === false || strlen($packed) !== 16) {
+            return $ip;
+        }
+
+        $prefixes = [
+            str_repeat("\0", 10)."\xff\xff",          // ::ffff:0:0/96, IPv4-mapped
+            str_repeat("\0", 12),                     // ::/96, IPv4-compatible (deprecated)
+            "\x00\x64\xff\x9b".str_repeat("\0", 8),   // 64:ff9b::/96, NAT64 well-known
+        ];
+
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($packed, $prefix)) {
+                return (string) inet_ntop(substr($packed, 12));
+            }
+        }
+
+        return $ip;
     }
 
     /**

@@ -22,6 +22,20 @@ docker run --rm -v "$PWD":/app -w /app php84-intl:latest composer check
 
 There is no dead-code or shell-lint tool configured.
 
+CI runs the suite on 8.2, 8.3 and 8.4, and `composer.lock` is not committed, so
+each version resolves its own dependencies — 8.2 gets PHPUnit 11 and Testbench
+10 while 8.4 gets 12 and 11. A green run on one version is therefore not proof
+of the others: PHP's own behavior differs too (`filter_var()` classifies
+`::ffff:127.0.0.1` as public on 8.2 and reserved from 8.3, which is how an SSRF
+hole once reached a release). Before tagging, run the suite on the oldest
+supported version as well, in a clean copy so dependencies resolve for it:
+
+```
+git archive HEAD | tar -x -C /tmp/pkg82 && cp phpunit.xml /tmp/pkg82/
+docker run --rm -v /tmp/pkg82:/app -w /app <php82-image> composer install
+docker run --rm -v /tmp/pkg82:/app -w /app <php82-image> vendor/bin/phpunit
+```
+
 ## Releasing
 
 Tags (`vX.Y.Z`) define versions; `main` is protected against force-push, so a
