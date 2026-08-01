@@ -73,9 +73,9 @@ return [
     |
     | `favicon_request_timeout` is the timeout in seconds of a SINGLE outbound
     | request, not of resolving one item: resolving fetches the linked page, then
-    | up to five icons it declares, then the root /favicon.ico — each of which
-    | may follow redirects — so the worst case for one item is a multiple of
-    | this value.
+    | up to five icons it declares, then favicon.ico in the link's own directory
+    | and at the host root — each of which may follow redirects — so the worst
+    | case for one item is a multiple of this value.
     |
     */
 

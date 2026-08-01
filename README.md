@@ -327,16 +327,29 @@ with a host and rejects the whole file if one is missing.
 
 For external links the plugin can resolve the site's favicon and store it in the `favicon_url` column, so **no remote HTTP request ever happens while the menu renders**.
 
-Resolution strategy (`FaviconResolver`), the same order a browser uses:
+Resolution strategy (`FaviconResolver`), most specific first:
 
 1. Parse the `<link rel="icon">` tags of the page the item links to, so a
    sub-page that declares its own icon (a Horizon or Telescope dashboard, a docs
    section) keeps it instead of the site-wide one.
-2. Fall back to the conventional `https://host/favicon.ico`.
+2. Try `favicon.ico` in the directory the link points at — `/admin/favicon.ico`
+   for an item linking to `/admin`, `/docs/favicon.ico` for one linking to
+   `/docs/page.html`.
+3. Fall back to the conventional `https://host/favicon.ico`.
+
+Step 2 is the one a browser does not do, and it exists for single-page apps: a
+Directus or Nova panel mounted on a sub-path inserts its `<link rel="icon">` from
+JavaScript, so the HTML this resolver reads declares nothing, while the host root
+of such a deployment is often an API that answers `404`. The icon still sits in
+the app's own directory. When the link already points at the host root, steps 2
+and 3 are the same URL and only one request is made.
 
 At most five declared icons are probed per page, so a page cannot dictate an
-unbounded number of outbound requests, and relative hrefs are resolved against
-the URL that actually answered (after redirects).
+unbounded number of outbound requests. Relative hrefs are resolved against the
+document's `<base href>` when it declares one (again, the SPA case: a shell with
+`<base href="/admin/">` means `href="favicon.ico"` is `/admin/favicon.ico`, not
+the site-wide icon) and otherwise against the URL that actually answered, after
+redirects.
 
 Resolution runs **anonymously**, with no session or cookies. A page behind auth
 answers `401`/`403`, so its own icon is unreachable; the root `favicon.ico` is

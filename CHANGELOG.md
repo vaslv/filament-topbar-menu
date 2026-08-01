@@ -5,6 +5,39 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A relative icon href is resolved against the document's `<base href>`.** The
+  tag was ignored, so a shell served from a sub-path — `<base href="/admin/">`
+  with `<link rel="icon" href="favicon.ico">`, which every single-page app
+  framework emits — stored the site-wide `/favicon.ico` instead of the app's own
+  `/admin/favicon.ico`: the same class of mistake as resolving against the
+  pre-redirect URL. Only the first `<base>` counts, the way a browser reads it,
+  and only an http(s) one with a host is honored — a `data:` or malformed base
+  leaves the answering URL in place rather than producing candidates the SSRF
+  check has no host to judge. A base pointing at another host is honored, as in
+  a browser; every candidate built from it still goes through that check.
+- **A trailing slash survives path normalization.** `/admin/` collapsed to
+  `/admin`, which changes what every relative reference underneath it resolves
+  to. This also affected a `Location` header of that shape.
+
+### Changed
+
+- **`favicon.ico` is now looked for in the directory the link points at before
+  the host root.** An item linking to `/admin` tries `/admin/favicon.ico` first,
+  one linking to `/docs/page.html` tries `/docs/favicon.ico`. A browser never
+  does this — it learns about anything but the root from the markup — but that
+  is not enough for a single-page app: a Directus or Nova panel on a sub-path
+  inserts its `<link rel="icon">` from JavaScript, so the server-rendered shell
+  declares no icon at all, and the host root of such a deployment is usually an
+  API that answers `404`. The icon still sits in the app's own directory. Costs
+  at most one extra request per item, only when the page's own icons produced
+  nothing — because it declared none, or because the ones it declared did not
+  answer — and none at all for a link to the host root, where the two
+  candidates coincide.
+
 ## [1.9.0]
 
 ### Added

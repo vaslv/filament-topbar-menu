@@ -74,16 +74,53 @@ class FaviconResolver
             return $declared;
         }
 
-        // 2. Fall back to the conventional root location, for pages that
-        //    declare nothing (or that the resolver cannot read — it browses
-        //    anonymously, so a page behind auth answers 401/403 here).
-        $faviconUrl = $base.'/favicon.ico';
-
-        if ($this->isStorableFaviconUrl($faviconUrl) && $this->isValidFavicon($faviconUrl)) {
-            return $faviconUrl;
+        // 2. Fall back to the conventional location, for pages that declare
+        //    nothing (or that the resolver cannot read — it browses
+        //    anonymously, so a page behind auth answers 401/403 here). The
+        //    directory the link points at is tried before the host root, so an
+        //    app mounted on a sub-path keeps its own icon.
+        foreach ($this->conventionalFaviconUrls($base, (string) (parse_url($url, PHP_URL_PATH) ?: '/')) as $faviconUrl) {
+            if ($this->isStorableFaviconUrl($faviconUrl) && $this->isValidFavicon($faviconUrl)) {
+                return $faviconUrl;
+            }
         }
 
         return null;
+    }
+
+    /**
+     * The conventional `favicon.ico` locations for a link, most specific first:
+     * the directory it points at, then the host root.
+     *
+     * A browser only ever asks for the root one — it learns about anything else
+     * from the markup. That is not enough here: a single-page app declares its
+     * icon from JavaScript, so the server-rendered shell this resolver reads has
+     * no `<link>` at all, and the root of such a host is often an API that 404s.
+     * A Directus panel on `/admin` is the shape of it: nothing in the HTML, no
+     * root icon, and the real one sitting at `/admin/favicon.ico`.
+     *
+     * The last segment is treated as a file when it contains a dot, so
+     * `/docs/page.html` probes `/docs/`, not `/docs/page.html/`. When the two
+     * candidates coincide (a link to the host root), only one request is made.
+     *
+     * @return list<string>
+     */
+    protected function conventionalFaviconUrls(string $base, string $path): array
+    {
+        $directory = $path;
+
+        if (! str_ends_with($directory, '/')) {
+            $lastSegment = substr($directory, strrpos($directory, '/') + 1);
+
+            $directory = str_contains($lastSegment, '.')
+                ? substr($directory, 0, strrpos($directory, '/') + 1)
+                : $directory.'/';
+        }
+
+        return array_values(array_unique([
+            $base.$this->normalizePath($directory).'favicon.ico',
+            $base.'/favicon.ico',
+        ]));
     }
 
     protected function isValidFavicon(string $url): bool
@@ -123,9 +160,15 @@ class FaviconResolver
             return null;
         }
 
-        if (! preg_match_all('/<link\b[^>]*>/i', $this->limitedBody($response), $matches)) {
+        $body = $this->limitedBody($response);
+
+        if (! preg_match_all('/<link\b[^>]*>/i', $body, $matches)) {
             return null;
         }
+
+        // A document may point its relative URLs somewhere else entirely, and
+        // the icon href is one of them.
+        $reference = $this->documentBaseUrl($body, $finalUrl);
 
         $candidates = [];
 
@@ -142,7 +185,7 @@ class FaviconResolver
                 continue;
             }
 
-            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href[1]), $finalUrl);
+            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href[1]), $reference);
 
             if ($candidate === null) {
                 continue;
@@ -174,6 +217,45 @@ class FaviconResolver
         }
 
         return null;
+    }
+
+    /**
+     * The URL the document's own relative references resolve against: its
+     * `<base href>` when it declares a usable one, otherwise the URL that
+     * answered.
+     *
+     * A single-page app served from a sub-path is the case that needs this. Its
+     * shell sets `<base href="/admin/">` and then declares `href="favicon.ico"`,
+     * which means `/admin/favicon.ico` in a browser and `/favicon.ico` to anyone
+     * who ignores the tag — the site-wide icon that asking the page first exists
+     * to stop preferring.
+     *
+     * Only the first `<base>` counts, the way a browser reads it, and only an
+     * http(s) one with a host is honored: a `data:` or malformed base leaves the
+     * answering URL in place rather than producing candidates with no host for
+     * the SSRF check to judge. A base pointing at another host is honored — that
+     * is what a browser does — and every candidate built from it still goes
+     * through that check before a request is made.
+     */
+    protected function documentBaseUrl(string $html, string $finalUrl): string
+    {
+        if (! preg_match('/<base\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i', $html, $match)) {
+            return $finalUrl;
+        }
+
+        $base = $this->makeAbsoluteUrl(html_entity_decode($match[1]), $finalUrl);
+
+        if ($base === null) {
+            return $finalUrl;
+        }
+
+        $scheme = strtolower((string) parse_url($base, PHP_URL_SCHEME));
+
+        if (! in_array($scheme, ['http', 'https'], true) || blank(parse_url($base, PHP_URL_HOST))) {
+            return $finalUrl;
+        }
+
+        return $base;
     }
 
     /**
@@ -226,7 +308,13 @@ class FaviconResolver
     }
 
     /**
-     * Collapse `.` and `..` segments in an absolute path.
+     * Collapse `.` and `..` segments in an absolute path, keeping a trailing
+     * slash where the path had one.
+     *
+     * The slash is not cosmetic: it is what makes a path a directory, and every
+     * relative reference underneath it resolves one level differently without it
+     * (`/admin/` + `favicon.ico` is `/admin/favicon.ico`, `/admin` + the same is
+     * `/favicon.ico`). A path ending in `.` or `..` denotes a directory too.
      */
     protected function normalizePath(string $path): string
     {
@@ -246,7 +334,13 @@ class FaviconResolver
             $segments[] = $segment;
         }
 
-        return '/'.implode('/', $segments);
+        $normalized = '/'.implode('/', $segments);
+
+        if ($normalized !== '/' && preg_match('#(/|/\.|/\.\.)$#', $path) === 1) {
+            $normalized .= '/';
+        }
+
+        return $normalized;
     }
 
     /**

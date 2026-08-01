@@ -358,4 +358,148 @@ class FaviconResolverTest extends TestCase
 
         $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com'));
     }
+
+    public function test_a_relative_href_is_resolved_against_the_documents_base_tag(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin/favicon.ico' => Http::response('app-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin' => Http::response(
+                '<html><head><base href="/admin/"><link rel="icon" href="favicon.ico"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // The shape every SPA served from a sub-path has. Ignoring <base> makes
+        // `href="favicon.ico"` mean the host root — the site-wide icon, and a
+        // different image than the one the browser shows on that page.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
+
+        $this->assertSame('https://example.com/admin/favicon.ico', $favicon);
+    }
+
+    public function test_a_base_tag_pointing_at_another_host_is_honored_like_a_browser_does(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://cdn.example.com/static/icon.png' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/app' => Http::response(
+                '<html><head><base href="https://cdn.example.com/static/"><link rel="icon" href="icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/app');
+
+        // The candidate still passes the SSRF check and the storable-URL rules;
+        // what <base> changes is which URL is proposed, not what is trusted.
+        $this->assertSame('https://cdn.example.com/static/icon.png', $favicon);
+    }
+
+    public function test_an_unusable_base_tag_leaves_the_answering_url_in_place(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/en/icon.png' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/en/docs' => Http::response(
+                // A base with no usable host: honoring it would build candidates
+                // the SSRF check has nothing to judge, so it is ignored and the
+                // page URL keeps resolving the href.
+                '<html><head><base href="data:text/html,x"><link rel="icon" href="icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/en/docs');
+
+        $this->assertSame('https://example.com/en/icon.png', $favicon);
+    }
+
+    public function test_the_favicon_of_the_linked_directory_is_probed_before_the_host_root(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin/favicon.ico' => Http::response('app-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin' => Http::response(
+                // A single-page app: the shell declares no icon at all, because
+                // its JavaScript inserts the <link> after the page has loaded.
+                '<html><head><title>Loading&hellip;</title></head><body><div id="app"></div></body></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
+
+        $this->assertSame('https://example.com/admin/favicon.ico', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.ico');
+    }
+
+    public function test_the_host_root_stays_the_last_conventional_location(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/admin' => Http::response(
+                '<html><head><title>No icon here</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+    }
+
+    public function test_the_last_path_segment_is_treated_as_a_file_when_it_has_an_extension(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/docs/favicon.ico' => Http::response('docs-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/docs/page.html' => Http::response(
+                '<html><head><title>No icon here</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/docs/page.html');
+
+        // The directory of the document, not a directory named after it: nothing
+        // is ever served from `/docs/page.html/`.
+        $this->assertSame('https://example.com/docs/favicon.ico', $favicon);
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'page.html/favicon.ico'));
+    }
+
+    public function test_a_link_to_the_host_root_is_probed_once(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response(
+                '<html><head><title>No icon here</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+
+        // The directory candidate and the root candidate are the same URL here,
+        // so the extra specificity must not cost an extra request.
+        $probes = 0;
+
+        foreach (Http::recorded() as [$request]) {
+            if ($request->url() === 'https://example.com/favicon.ico') {
+                $probes++;
+            }
+        }
+
+        $this->assertSame(1, $probes);
+    }
 }
