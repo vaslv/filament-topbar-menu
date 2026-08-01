@@ -10,6 +10,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmptyState;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use InvalidArgumentException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -57,6 +58,30 @@ class ListTopbarMenuItems extends ListRecords
         }
 
         return parent::content($schema);
+    }
+
+    /**
+     * Keep the drag-and-drop view in the order the rest of the page uses.
+     *
+     * Filament orders a reordering table by the reorder column alone, which is
+     * the flat `sort` the table deliberately does not list by — so switching
+     * reorder mode on would reshuffle every row under the admin's cursor, and
+     * a drag would be aimed at a list that is about to rearrange itself again.
+     *
+     * A drag still writes plain sequential `sort` values across the whole page,
+     * so moving an item between groups only changes its position among its own
+     * siblings — reordering does not reparent, the Parent field does.
+     *
+     * @param  EloquentBuilder<TopbarMenuItem>  $query
+     * @return EloquentBuilder<TopbarMenuItem>
+     */
+    protected function applySortingToTableQuery(EloquentBuilder $query): EloquentBuilder
+    {
+        if ($this->isTableReordering()) {
+            return $query->treeOrdered();
+        }
+
+        return parent::applySortingToTableQuery($query);
     }
 
     protected function setupTableAction(): Action

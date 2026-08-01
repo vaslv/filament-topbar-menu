@@ -29,6 +29,7 @@ use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Route;
 use Throwable;
@@ -471,6 +472,18 @@ class TopbarMenuItemResource extends Resource
             ]);
     }
 
+    /**
+     * The order the items table lands on. Filament evaluates this by parameter
+     * name, so `$query` must keep its name.
+     *
+     * @param  Builder<TopbarMenuItem>  $query
+     * @return Builder<TopbarMenuItem>
+     */
+    public static function menuOrder(Builder $query): Builder
+    {
+        return $query->treeOrdered();
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -541,7 +554,12 @@ class TopbarMenuItemResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('sort')
+            // Not `defaultSort('sort')`: that column is a position among
+            // siblings, so ordering the flat table by it puts one group's
+            // children between another group's roots. treeOrdered() lists the
+            // menu the way the topbar renders it. A column header the admin
+            // clicks still wins — this is only the order they land on.
+            ->defaultSort(static::menuOrder(...))
             ->reorderable('sort')
             // Filament persists reorders with a bulk query-builder UPDATE that
             // fires no Eloquent events, so the model's saved-hook cache flush

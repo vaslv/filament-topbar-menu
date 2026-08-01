@@ -38,6 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer — and none at all for a link to the host root, where the two
   candidates coincide.
 
+- **The items table lists the menu in the order the topbar renders it.** Each
+  top-level item sits at its `sort` position with its children directly beneath
+  it. The table ordered flat by `sort`, but that column is a position among
+  *siblings*, not a rank across the table: one group's children landed between
+  another group's roots, and a page whose job is "what does the topbar look
+  like" answered something else. Ties fall back to `id`, the same key
+  `TopbarMenuItem::ordered()` uses when the menu itself is built. Sorting by a
+  column header is unaffected — this is the order the page lands on.
+
+  A group is keyed by its root ancestor two hops up, so the third level the
+  table lists but the menu never renders — the rows left behind by giving a
+  group a parent of its own — stays under the item it hangs off instead of
+  sorting by its parent's `sort` into the middle of unrelated groups. This
+  table is where those rows are found and fixed.
+
+  Drag-and-drop reordering now shows that same order instead of switching to the
+  flat one when it is turned on, which used to rearrange the rows the admin was
+  about to drag. A drag still writes plain sequential `sort` values, so moving a
+  row between groups changes its position among its own siblings only —
+  reordering does not reparent, the Parent field does.
+
 ### Removed
 
 - **The per-row "Fetch favicon" action in the items table.** Resolving a single

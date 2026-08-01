@@ -153,6 +153,99 @@ class TopbarMenuItem extends Model
     }
 
     /**
+     * Order a flat result set the way the rendered menu reads it: every root at
+     * its own position, its children immediately after it, each level by the
+     * `sort`/`id` keys ordered() applies within one level.
+     *
+     * `sort` is a position among SIBLINGS, not a rank across the whole table,
+     * so ordering flat by that column drops one group's children between
+     * another group's roots. The group a row belongs to therefore sorts by its
+     * root's position first, and only then does the row sort within its group.
+     *
+     * Two levels are what the menu renders, but the table lists a third when
+     * one exists — giving a group a parent of its own keeps the rows and drops
+     * them off the menu, and this table is where an admin goes to find them. So
+     * the group is keyed by the row's ROOT ancestor, up to two hops away, and a
+     * third-level row sits under the second-level one it hangs off instead of
+     * being scattered among unrelated roots by its parent's `sort`. Deeper than
+     * that the grouping degrades to the same interleaving, which is no worse
+     * than not looking up ancestors at all.
+     *
+     * The ancestor lookups are correlated subqueries rather than a self-join on
+     * purpose: this runs on the admin table, which also searches and sorts on
+     * columns of this same table — and on `parent.label`, for which Filament
+     * adds a join of its own. More copies of the table in the FROM clause would
+     * make those references ambiguous. The cost is a handful of lookups per
+     * row, which a menu-sized table can afford; the render path keeps using
+     * ordered() per level and never runs this.
+     *
+     * @param  Builder<TopbarMenuItem>  $query
+     * @return Builder<TopbarMenuItem>
+     */
+    public function scopeTreeOrdered(Builder $query): Builder
+    {
+        $grammar = $query->getQuery()->getGrammar();
+
+        $table = $grammar->wrapTable($this->getTable());
+        $parent = $grammar->wrapTable('topbar_menu_parent');
+        $grandparent = $grammar->wrapTable('topbar_menu_grandparent');
+
+        $own = fn (string $column): string => $table.'.'.$grammar->wrap($column);
+
+        // The value `$column` has on the row's parent, or null for a root.
+        $ofParent = fn (string $column): string => sprintf(
+            '(select %s.%s from %s as %s where %s.%s = %s)',
+            $parent, $grammar->wrap($column),
+            $table, $parent,
+            $parent, $grammar->wrap('id'), $own('parent_id'),
+        );
+
+        // Null unless the row is a third level: what its parent hangs off.
+        $grandparentId = $ofParent('parent_id');
+
+        $ofGrandparent = fn (string $column): string => sprintf(
+            '(select %s.%s from %s as %s where %s.%s = %s)',
+            $grandparent, $grammar->wrap($column),
+            $table, $grandparent,
+            $grandparent, $grammar->wrap('id'), $grandparentId,
+        );
+
+        // The row's root ancestor — itself, its parent or its grandparent.
+        // coalesce(), not a nulls-first assumption: the lookups are null above
+        // the row's own depth, and where a null sorts differs between databases.
+        $rootKey = fn (string $column): string => sprintf(
+            'coalesce(%s, %s, %s)',
+            $ofGrandparent($column), $ofParent($column), $own($column),
+        );
+
+        // The second-level item the row belongs to: itself when the row is one,
+        // its parent when the row is a third level. Roots never reach this key,
+        // the depth marker before it having already placed them.
+        $branchKey = fn (string $column): string => sprintf(
+            'case when %s is null then %s else %s end',
+            $grandparentId, $own($column), $ofParent($column),
+        );
+
+        $isBelow = fn (string $expression): string => sprintf(
+            'case when %s is null then 0 else 1 end',
+            $expression,
+        );
+
+        return $query
+            ->orderByRaw($rootKey('sort'))
+            ->orderByRaw($rootKey('id'))
+            // Within a group the root comes before everything under it,
+            ->orderByRaw($isBelow($own('parent_id')))
+            // its second-level items follow in their own order,
+            ->orderByRaw($branchKey('sort'))
+            ->orderByRaw($branchKey('id'))
+            // and each of those comes before the rows hanging off it.
+            ->orderByRaw($isBelow($grandparentId))
+            ->orderBy($this->qualifyColumn('sort'))
+            ->orderBy($this->qualifyColumn('id'));
+    }
+
+    /**
      * Build the final URL of the item, depending on its type.
      */
     public function resolveUrl(): ?string

@@ -135,6 +135,13 @@ Menu items live in the `filament_topbar_menu_items` table and are managed throug
   parent of its own keeps the rows but drops them off the menu: its children land
   on a third level, which is never rendered
 - **Active** toggle and **sort** order (rows can also be reordered by drag & drop)
+
+The table lists the items the way the topbar renders them: each top-level item at
+its `sort` position with its children right underneath it, ties broken by id.
+`sort` is a position among siblings rather than a rank across the whole table, so
+the two only look the same while the menu is flat. Clicking a column header sorts
+by that column as usual; dragging a row writes new `sort` values but never
+changes an item's parent — use the **Parent item** field for that.
 - **Visibility** — everyone, authenticated users only, or guests only
 
 ### View page
