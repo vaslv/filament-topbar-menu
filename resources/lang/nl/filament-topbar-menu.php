@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'Favicon-URL',
         ],
+        'favicon_data' => [
+            'label' => 'Ingesloten favicon',
+            'upload' => 'Pictogram uploaden',
+            'helper' => 'Wordt in het menu zelf opgeslagen, niet op een schijf. Gebruik dit wanneer het pictogram niet bereikbaar is vanuit de browser van elke bezoeker — een site achter een login of een uitsluitend interne dienst. Een ingesloten pictogram gaat vóór de favicon-URL.',
+        ],
         'visibility' => [
             'label' => 'Zichtbaar voor',
             'placeholder' => 'Iedereen',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Favicon ophalen',
         'fetch_favicon_tooltip' => 'Bepaal de favicon op basis van de bovenstaande URL',
         'fetch_favicons' => 'Favicons ophalen',
+        'embed_favicon' => 'Ophalen en insluiten',
+        'embed_favicon_tooltip' => 'De favicon van de bovenstaande URL downloaden en de afbeelding zelf opslaan',
+        'clear_favicon_data' => 'Verwijderen',
         'export' => 'Exporteren',
         'import' => 'Importeren',
         'create_table' => 'Menutabel aanmaken',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon gevonden',
+        'favicon_embedded' => 'Favicon gedownload en ingesloten',
         'favicon_not_found' => 'Geen favicon gevonden',
+        'favicon_upload_rejected' => 'Bestand niet opgeslagen: het moet een afbeelding van maximaal :size zijn',
         'enter_url_first' => 'Voer eerst een externe URL in',
         'favicons_resolved' => ':count favicon(s) gevonden',
+        'favicons_overridden' => 'Bij :count item(s) gaat een ingesloten pictogram vóór de link — de topbar blijft dat tonen.',
         'import_success' => ':count menu-item(s) geïmporteerd',
         'import_invalid' => 'Het bestand is geen geldige export van het topbalkmenu',
         'cache_flushed' => 'Menucache geleegd',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'Favicon-resolutie is uitgeschakeld (filament-topbar-menu.enable_favicons); niets te doen.',
         'nothing_to_refresh' => 'Geen menu-items hebben een favicon-update nodig.',
         'not_found' => 'niet gevonden',
+        'embedded' => 'ingesloten (:type)',
         'resolved_summary' => ':resolved van :total favicon(s) gevonden.',
         'table_created' => 'Menutabel ":table" is aangemaakt op de verbinding ":connection".',
         'table_exists' => 'Menutabel ":table" bestaat al op de verbinding ":connection"; niets te doen.',
+        'column_added' => 'Kolom ":column" toegevoegd aan de menutabel ":table".',
         'copied' => ':count menu-item(s) gekopieerd van de standaardverbinding naar ":connection".',
         'copy_skipped_existing' => 'Kopiëren overgeslagen: het menu op ":connection" bevat al items; het lokale menu van deze app wordt er niet mee samengevoegd.',
         'copy_skipped_no_dedicated' => 'Kopiëren overgeslagen: er is geen speciale verbinding geconfigureerd; het menu staat al op de standaardverbinding.',

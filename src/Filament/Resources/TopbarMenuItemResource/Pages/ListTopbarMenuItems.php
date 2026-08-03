@@ -227,7 +227,14 @@ class ListTopbarMenuItems extends ListRecords
                     ->acceptedFileTypes(['application/json', 'text/json', 'text/plain'])
                     // Bound the upload so a large file cannot exhaust memory
                     // when it is read and decoded in one shot below.
-                    ->maxSize(2048)
+                    //
+                    // Sized against what this package's own export can produce,
+                    // not a round number: an embedded favicon travels inside
+                    // the file as base64, so a menu of embedded icons is orders
+                    // of magnitude larger than a menu of links. A limit that
+                    // rejects a file this very panel exported would be a
+                    // one-way door dressed up as validation.
+                    ->maxSize(16384)
                     ->required()
                     // The file is parsed right here in the action; nothing
                     // should be persisted to the panel's default disk.

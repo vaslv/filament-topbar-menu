@@ -35,6 +35,7 @@ class TopbarMenuServiceProvider extends ServiceProvider
 
             $this->publishes([
                 __DIR__.'/../database/migrations/create_filament_topbar_menu_items_table.php' => database_path('migrations/create_filament_topbar_menu_items_table.php'),
+                __DIR__.'/../database/migrations/add_favicon_data_to_filament_topbar_menu_items_table.php' => database_path('migrations/add_favicon_data_to_filament_topbar_menu_items_table.php'),
             ], 'filament-topbar-menu-migrations');
 
             $this->publishes([

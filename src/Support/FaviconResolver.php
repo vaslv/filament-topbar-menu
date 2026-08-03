@@ -2,9 +2,11 @@
 
 namespace Vaslv\FilamentTopbarMenu\Support;
 
+use Closure;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
+use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
 /**
  * Resolves the favicon URL of an external website.
@@ -46,7 +48,88 @@ class FaviconResolver
      */
     protected const MAX_ICON_CANDIDATES = 5;
 
+    /**
+     * The conventional icon file names, tried in this order inside each
+     * candidate directory.
+     *
+     * `favicon.ico` is the only one a browser guesses at, but it is no longer
+     * the only one sites ship: a modern site commonly serves `favicon.svg`
+     * alone and declares it from the markup — which leaves nothing at all for a
+     * resolver that can't read that markup (a page behind auth, a shell whose
+     * icon is declared from JavaScript) and only ever asks for the `.ico`.
+     *
+     * The order is what a browser would settle on when a host has several. The
+     * list stays short on purpose: every name is one more outbound request per
+     * candidate directory on a host that has no icon at all, and
+     * `apple-touch-icon.png` — the obvious fourth — is left out because a site
+     * that ships one virtually always declares it in the markup, where step 1
+     * already picks it up.
+     *
+     * @var list<string>
+     */
+    protected const CONVENTIONAL_FAVICON_NAMES = [
+        'favicon.ico',
+        'favicon.svg',
+        'favicon.png',
+    ];
+
+    /**
+     * The URL of the site's favicon, to be stored as a link. The visitor's own
+     * browser is what fetches it later, so this only works for icons every
+     * panel user can reach — see resolveEmbedded() for the ones they cannot.
+     */
     public function resolve(string $url): ?string
+    {
+        return $this->locate($url)['url'] ?? null;
+    }
+
+    /**
+     * The site's favicon as a self-contained `data:` URI, bytes and all.
+     *
+     * This is the form to store when the icon is not reachable from every
+     * visitor's browser: a host behind HTTP auth, an internal-only service, a
+     * site that blocks hotlinking. A stored link would render as a broken image
+     * (or, worse, prompt each visitor for the site's credentials); the embedded
+     * copy renders for everyone and makes the panel stop reaching out to
+     * third-party hosts on every page load.
+     *
+     * The same page-declared / conventional-location search resolve() runs, and
+     * the same SSRF guard, so this cannot reach anything resolve() would refuse.
+     *
+     * Where it differs: a candidate that cannot be embedded does not end the
+     * search. "Too big to store" and "not a format we render" are not the same
+     * answer as "this site has no icon" — a page whose first declared icon is a
+     * 180×180 apple-touch-icon usually declares the real one right below it.
+     * Returns null only when nothing on the page can be embedded.
+     */
+    public function resolveEmbedded(string $url): ?string
+    {
+        $data = null;
+
+        $this->locate($url, function (string $body) use (&$data): bool {
+            $data = TopbarMenuItem::faviconDataFromBytes($body);
+
+            return $data !== null;
+        });
+
+        return $data;
+    }
+
+    /**
+     * Find the site's favicon: its URL and the bytes that answered there.
+     *
+     * The bytes come back with the URL because the search has already read them
+     * — a candidate only counts once it has been fetched and confirmed to be an
+     * image. Returning them lets resolveEmbedded() store the icon without
+     * downloading it a second time.
+     *
+     * @param  Closure(string): bool|null  $accept  Extra test a fetched candidate
+     *                                              must pass. When it fails, the
+     *                                              search moves on to the next
+     *                                              candidate instead of stopping.
+     * @return array{url: string, body: string}|null
+     */
+    protected function locate(string $url, ?Closure $accept = null): ?array
     {
         if (! config('filament-topbar-menu.enable_favicons', true)) {
             return null;
@@ -68,20 +151,27 @@ class FaviconResolver
         //    Telescope dashboard, a docs section) usually overrides the site
         //    icon this way, so asking the page first is what makes the stored
         //    favicon match what the link actually leads to.
-        $declared = $this->resolveFromHtml($url);
+        $declared = $this->resolveFromHtml($url, $accept);
 
         if ($declared !== null) {
             return $declared;
         }
 
-        // 2. Fall back to the conventional location, for pages that declare
+        // 2. Fall back to the conventional locations, for pages that declare
         //    nothing (or that the resolver cannot read — it browses
         //    anonymously, so a page behind auth answers 401/403 here). The
         //    directory the link points at is tried before the host root, so an
-        //    app mounted on a sub-path keeps its own icon.
+        //    app mounted on a sub-path keeps its own icon, and each is tried in
+        //    every conventional format, not just `.ico`.
         foreach ($this->conventionalFaviconUrls($base, (string) (parse_url($url, PHP_URL_PATH) ?: '/')) as $faviconUrl) {
-            if ($this->isStorableFaviconUrl($faviconUrl) && $this->isValidFavicon($faviconUrl)) {
-                return $faviconUrl;
+            if (! $this->isStorableFaviconUrl($faviconUrl)) {
+                continue;
+            }
+
+            $body = $this->fetchFavicon($faviconUrl);
+
+            if ($body !== null && ($accept === null || $accept($body))) {
+                return ['url' => $faviconUrl, 'body' => $body];
             }
         }
 
@@ -89,19 +179,24 @@ class FaviconResolver
     }
 
     /**
-     * The conventional `favicon.ico` locations for a link, most specific first:
-     * the directory it points at, then the host root.
+     * The conventional icon locations for a link: every name in
+     * CONVENTIONAL_FAVICON_NAMES under the directory the link points at, then
+     * the same names under the host root.
      *
-     * A browser only ever asks for the root one — it learns about anything else
-     * from the markup. That is not enough here: a single-page app declares its
-     * icon from JavaScript, so the server-rendered shell this resolver reads has
-     * no `<link>` at all, and the root of such a host is often an API that 404s.
-     * A Directus panel on `/admin` is the shape of it: nothing in the HTML, no
-     * root icon, and the real one sitting at `/admin/favicon.ico`.
+     * A browser only ever asks for the root `favicon.ico` — it learns about
+     * anything else from the markup. That is not enough here: a single-page app
+     * declares its icon from JavaScript, so the server-rendered shell this
+     * resolver reads has no `<link>` at all, and the root of such a host is
+     * often an API that 404s. A Directus panel on `/admin` is the shape of it:
+     * nothing in the HTML, no root icon, and the real one sitting at
+     * `/admin/favicon.ico`.
+     *
+     * Directory before name, so a sub-path app's own icon still beats the
+     * site-wide one whatever format either is in.
      *
      * The last segment is treated as a file when it contains a dot, so
      * `/docs/page.html` probes `/docs/`, not `/docs/page.html/`. When the two
-     * candidates coincide (a link to the host root), only one request is made.
+     * directories coincide (a link to the host root), each name is tried once.
      *
      * @return list<string>
      */
@@ -117,36 +212,62 @@ class FaviconResolver
                 : $directory.'/';
         }
 
-        return array_values(array_unique([
-            $base.$this->normalizePath($directory).'favicon.ico',
-            $base.'/favicon.ico',
-        ]));
+        $urls = [];
+
+        foreach ([$this->normalizePath($directory), '/'] as $candidateDirectory) {
+            foreach (self::CONVENTIONAL_FAVICON_NAMES as $name) {
+                $urls[] = $base.$candidateDirectory.$name;
+            }
+        }
+
+        return array_values(array_unique($urls));
     }
 
-    protected function isValidFavicon(string $url): bool
+    /**
+     * Fetch a favicon candidate and return its bytes, or null when the URL does
+     * not answer with something that can be an icon.
+     *
+     * A missing `Content-Type` is accepted — plenty of static hosts omit it for
+     * `.ico` — but an HTML error page served with `200` is not, which is what
+     * the type check is really for: a single-page app answers its own 404 route
+     * with the app shell, and storing that as an icon would be a broken image on
+     * every panel page.
+     */
+    protected function fetchFavicon(string $url): ?string
     {
         $response = $this->request($url);
 
         if ($response === null || ! $response->successful()) {
-            return false;
+            return null;
         }
 
-        if ($this->limitedBody($response) === '') {
-            return false;
+        $body = $this->limitedBody($response);
+
+        if ($body === '') {
+            return null;
         }
 
         $contentType = strtolower($response->header('Content-Type'));
 
         if ($contentType === '') {
-            return true;
+            return $body;
         }
 
-        return str_contains($contentType, 'image')
+        $isImage = str_contains($contentType, 'image')
             || str_contains($contentType, 'icon')
             || str_contains($contentType, 'octet-stream');
+
+        return $isImage ? $body : null;
     }
 
-    protected function resolveFromHtml(string $pageUrl): ?string
+    /**
+     * The icon the page declares, as its URL plus the bytes that answered
+     * there — see locate() for why the bytes come along.
+     *
+     * @param  Closure(string): bool|null  $accept  See locate().
+     * @return array{url: string, body: string}|null
+     */
+    protected function resolveFromHtml(string $pageUrl, ?Closure $accept = null): ?array
     {
         // Relative hrefs belong to the page that actually answered, not to the
         // URL asked for: `https://host/docs` → 301 → `https://host/docs/` with
@@ -173,19 +294,19 @@ class FaviconResolver
         $candidates = [];
 
         foreach ($matches[0] as $tag) {
-            if (! preg_match('/\brel\s*=\s*["\']([^"\']*)["\']/i', $tag, $rel)) {
+            $rel = $this->attributeValue($tag, 'rel');
+
+            if ($rel === null || preg_match('/\bicon\b/i', $rel) !== 1) {
                 continue;
             }
 
-            if (! preg_match('/\bicon\b/i', $rel[1])) {
+            $href = $this->attributeValue($tag, 'href');
+
+            if (blank($href)) {
                 continue;
             }
 
-            if (! preg_match('/\bhref\s*=\s*["\']([^"\']+)["\']/i', $tag, $href)) {
-                continue;
-            }
-
-            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href[1]), $reference);
+            $candidate = $this->makeAbsoluteUrl(html_entity_decode($href), $reference);
 
             if ($candidate === null) {
                 continue;
@@ -200,23 +321,89 @@ class FaviconResolver
             }
 
             // Deduplicate before counting: a page repeating one href across
-            // several rel variants must not eat the probe budget.
-            $candidates[$candidate] = true;
+            // several rel variants must not eat the probe budget. The best rank
+            // an href is declared with is the one it keeps.
+            $rank = $this->iconRelRank($rel);
+
+            $candidates[$candidate] = min($candidates[$candidate] ?? PHP_INT_MAX, $rank);
 
             if (count($candidates) >= self::MAX_ICON_CANDIDATES) {
                 break;
             }
         }
 
+        // Rank before document order: a page commonly declares its
+        // apple-touch-icon first, and that one is a 180×180 home-screen tile,
+        // not the tab icon this package renders at ~16px. Taking it because it
+        // came first stores several times the bytes for a worse marker — and,
+        // when it is over the embed cap, loses to a real icon further down the
+        // list. asort keeps document order within a rank.
+        asort($candidates);
+
         foreach (array_keys($candidates) as $candidate) {
             // The candidate must resolve to a real image, so a wrong href isn't
             // saved as a silently-broken favicon.
-            if ($this->isValidFavicon($candidate)) {
-                return $candidate;
+            $body = $this->fetchFavicon($candidate);
+
+            if ($body !== null && ($accept === null || $accept($body))) {
+                return ['url' => $candidate, 'body' => $body];
             }
         }
 
         return null;
+    }
+
+    /**
+     * How much a `rel` value looks like the icon a browser shows in the tab,
+     * lower being better. This is the whole ordering: `rel="icon"` and its
+     * legacy `shortcut icon` spelling are what the page nominates as its tab
+     * icon; `apple-touch-icon` is a home-screen tile at 180×180; `mask-icon`
+     * and the rest are single-colour or platform-specific and worse still.
+     *
+     * Matched on whole `rel` tokens, the way a browser reads the attribute, so
+     * `apple-touch-icon` never counts as a plain `icon`.
+     */
+    protected function iconRelRank(string $rel): int
+    {
+        $tokens = preg_split('/\s+/', strtolower(trim($rel))) ?: [];
+
+        if (in_array('icon', $tokens, true)) {
+            return 0;
+        }
+
+        foreach ($tokens as $token) {
+            if (str_starts_with($token, 'apple-touch-icon')) {
+                return 1;
+            }
+        }
+
+        return 2;
+    }
+
+    /**
+     * Read one attribute out of a start tag, the way an HTML parser does:
+     * double-quoted, single-quoted or unquoted.
+     *
+     * The unquoted form is the reason this exists. `<link rel=icon
+     * href=/favicon.svg>` is valid HTML and is exactly what an HTML minifier
+     * emits — a pattern that insists on quotes sees no icon on such a page at
+     * all and silently falls through to guessing at file names.
+     *
+     * The name is matched with a `[\w-]` guard rather than `\b`, so `data-href`
+     * is not read as `href`.
+     *
+     * @return string|null Null when the tag carries no such attribute; the
+     *                     empty string when it carries an empty one.
+     */
+    protected function attributeValue(string $tag, string $attribute): ?string
+    {
+        $pattern = '/(?<![\w-])'.preg_quote($attribute, '/').'\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]*))/i';
+
+        if (preg_match($pattern, $tag, $match, PREG_UNMATCHED_AS_NULL) !== 1) {
+            return null;
+        }
+
+        return $match[1] ?? $match[2] ?? $match[3] ?? '';
     }
 
     /**
@@ -239,11 +426,17 @@ class FaviconResolver
      */
     protected function documentBaseUrl(string $html, string $finalUrl): string
     {
-        if (! preg_match('/<base\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i', $html, $match)) {
+        if (! preg_match('/<base\b[^>]*>/i', $html, $match)) {
             return $finalUrl;
         }
 
-        $base = $this->makeAbsoluteUrl(html_entity_decode($match[1]), $finalUrl);
+        $href = $this->attributeValue($match[0], 'href');
+
+        if (blank($href)) {
+            return $finalUrl;
+        }
+
+        $base = $this->makeAbsoluteUrl(html_entity_decode($href), $finalUrl);
 
         if ($base === null) {
             return $finalUrl;

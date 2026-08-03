@@ -24,6 +24,7 @@ use Vaslv\FilamentTopbarMenu\TopbarMenu;
  * @property string $target
  * @property string|null $icon
  * @property string|null $favicon_url
+ * @property string|null $favicon_data
  * @property bool $is_active
  * @property int $sort
  * @property array<string, mixed>|null $visibility
@@ -43,6 +44,31 @@ class TopbarMenuItem extends Model
 
     public const TARGET_BLANK = '_blank';
 
+    /**
+     * The image types an embedded favicon may carry. A stored `data:` URI is
+     * rendered as `<img src>` in every panel page, so the type is a whitelist
+     * rather than anything the source host happened to send.
+     *
+     * `image/svg+xml` is on the list, and deliberately: an SVG referenced by an
+     * `<img>` is a passive image — scripts in it do not run and it cannot reach
+     * the embedding document — which is what makes the format safe here while
+     * it is not safe inline. Everything else is a raster format with no
+     * scripting model at all.
+     *
+     * @var list<string>
+     */
+    public const FAVICON_DATA_TYPES = [
+        'image/png',
+        'image/jpeg',
+        'image/gif',
+        'image/webp',
+        'image/avif',
+        'image/svg+xml',
+        'image/x-icon',
+        'image/vnd.microsoft.icon',
+        'image/bmp',
+    ];
+
     protected $fillable = [
         'parent_id',
         'label',
@@ -53,6 +79,7 @@ class TopbarMenuItem extends Model
         'target',
         'icon',
         'favicon_url',
+        'favicon_data',
         'is_active',
         'sort',
         'visibility',
@@ -579,14 +606,25 @@ class TopbarMenuItem extends Model
 
     /**
      * The visual marker of the item exactly as the topbar renders it: the
-     * favicon URL when one is set AND URL-shaped (Filament renders only
-     * slash-containing strings as an <img>; see below), otherwise the validated
-     * icon name — so a favicon always replaces the icon. Shared by every surface
-     * that shows the marker — the topbar, its dropdowns, the admin table and
-     * the View page — so none of them can disagree with the rendered menu.
+     * embedded favicon when one is stored, else the favicon URL when one is set
+     * AND URL-shaped (Filament renders only slash-containing strings as an
+     * <img>; see below), else the validated icon name — so a favicon always
+     * replaces the icon. Shared by every surface that shows the marker — the
+     * topbar, its dropdowns, the admin table and the View page — so none of them
+     * can disagree with the rendered menu.
      */
     public function displayIcon(): ?string
     {
+        // The embedded copy wins: it was stored precisely because the remote URL
+        // is not reachable from every visitor's browser (a host behind auth, an
+        // internal-only service), so preferring the link would put back the
+        // broken image the embedding exists to avoid. It is validated on the way
+        // out, not trusted: the column may hold anything on a fleet-shared menu
+        // table, and this value goes straight into an <img src>.
+        if (static::isStorableFaviconData($this->favicon_data)) {
+            return $this->favicon_data;
+        }
+
         // Only a URL-shaped favicon may reach Filament's icon slot: it renders
         // a slash-containing string as an <img>, but treats anything else as a
         // registered icon NAME and throws SvgNotFound — which 500s every panel
@@ -599,6 +637,169 @@ class TopbarMenuItem extends Model
 
         return static::safeIconName($this->icon);
     }
+
+    /**
+     * Whether a value is an embedded favicon this package is willing to render:
+     * a base64 `data:` URI of a whitelisted image type, decodable, non-empty and
+     * within the configured byte cap.
+     *
+     * Everything here is checked at RENDER time, not only when writing. The
+     * column is as untrusted as `favicon_url` is — a sibling app on a shared
+     * menu database, a seeder or hand-written SQL can put anything in it — and
+     * the value is interpolated into an `<img src>` on every panel page. Only
+     * the base64 form is accepted: percent-encoded `data:` payloads may contain
+     * quotes and angle brackets, and nothing this package writes needs them.
+     */
+    public static function isStorableFaviconData(?string $value): bool
+    {
+        if (blank($value)) {
+            return false;
+        }
+
+        // Length first, before the regex touches the string. This runs on every
+        // render of every item, on a mediumText column the docblock above calls
+        // untrusted — so an oversized value must cost O(1), not a full anchored
+        // scan plus a decode of megabytes. base64 is 4 characters per 3 bytes,
+        // plus the `data:<type>;base64,` prefix.
+        if (strlen($value) > self::FAVICON_DATA_PREFIX_BUDGET + (int) ceil(static::faviconMaxBytes() / 3) * 4) {
+            return false;
+        }
+
+        // `\z` rather than `$`: PCRE's `$` also matches before a trailing
+        // newline, which would let "…;base64,AAAA\n" through the gate and into
+        // an `<img src>` / CSS `url('…')` sink that has no use for it.
+        if (preg_match('#^data:([a-z0-9.+-]+/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})\z#i', $value, $match) !== 1) {
+            return false;
+        }
+
+        if (! in_array(strtolower($match[1]), self::FAVICON_DATA_TYPES, true)) {
+            return false;
+        }
+
+        $bytes = base64_decode($match[2], true);
+
+        return $bytes !== false
+            && $bytes !== ''
+            && strlen($bytes) <= static::faviconMaxBytes();
+    }
+
+    /**
+     * Default byte cap for an embedded favicon. One constant rather than a
+     * literal repeated at each fallback, so a missing config value and an
+     * unusable one cannot drift to different caps.
+     */
+    public const FAVICON_MAX_BYTES_DEFAULT = 65536;
+
+    /**
+     * Headroom for the `data:<type>;base64,` prefix in the O(1) length check.
+     * The longest whitelisted type is `image/vnd.microsoft.icon` (24 chars),
+     * so 64 leaves room without needing to be exact — the real check follows.
+     */
+    protected const FAVICON_DATA_PREFIX_BUDGET = 64;
+
+    /**
+     * Largest cap the storage can honour, in DECODED bytes: `favicon_data` is
+     * a mediumText column (16,777,215 bytes) holding base64, which inflates by
+     * four thirds. Past this, MySQL silently truncates the icon in non-strict
+     * mode and throws a raw driver error in strict mode — neither of which the
+     * config's author asked for by typing a larger number.
+     */
+    protected const FAVICON_MAX_BYTES_CEILING = 12582911;
+
+    /**
+     * The byte cap for an embedded favicon, applied to the DECODED image. The
+     * cap protects the menu cache more than the database: the snapshot holds
+     * every item's raw attributes and is written to and read from the cache
+     * store on every miss, so an oversized icon is paid for on each rebuild.
+     */
+    public static function faviconMaxBytes(): int
+    {
+        $configured = config('filament-topbar-menu.favicon_max_bytes', self::FAVICON_MAX_BYTES_DEFAULT);
+
+        if (! is_numeric($configured) || (int) $configured <= 0) {
+            return self::FAVICON_MAX_BYTES_DEFAULT;
+        }
+
+        return min((int) $configured, self::FAVICON_MAX_BYTES_CEILING);
+    }
+
+    /**
+     * Build an embedded favicon value from raw image bytes, or null when the
+     * bytes are not a whitelisted image or exceed the cap.
+     *
+     * The type is taken from the bytes themselves rather than from a header or
+     * a file name: a `Content-Type` is the remote host's claim about a response
+     * this package is about to persist and render, and an upload's reported type
+     * is the browser's. SVG has no magic number, so it is recognised by its
+     * markup — after the raster sniff, so a file that is really a PNG is never
+     * relabelled by a stray "<svg" inside it.
+     */
+    public static function faviconDataFromBytes(string $bytes): ?string
+    {
+        if ($bytes === '' || strlen($bytes) > static::faviconMaxBytes()) {
+            return null;
+        }
+
+        $type = static::sniffImageType($bytes);
+
+        if ($type === null) {
+            return null;
+        }
+
+        return 'data:'.$type.';base64,'.base64_encode($bytes);
+    }
+
+    /**
+     * The image type of a byte string, by content: magic numbers for the raster
+     * formats, markup for SVG. Null for anything not on FAVICON_DATA_TYPES.
+     */
+    protected static function sniffImageType(string $bytes): ?string
+    {
+        // getimagesizefromstring() covers the raster formats portably (it reads
+        // the header only) and, unlike finfo, needs no extension beyond GD's
+        // presence-independent parser.
+        $size = @getimagesizefromstring($bytes);
+
+        if (is_array($size)) {
+            $type = strtolower($size['mime']);
+
+            if (in_array($type, self::FAVICON_DATA_TYPES, true)) {
+                return $type;
+            }
+        }
+
+        // Container signatures for the formats getimagesizefromstring() may not
+        // read: it has no AVIF parser at all, and it reports a WebP only when it
+        // can read the dimensions, so a variant it does not know falls through
+        // to here. RIFF….WEBP, and an ISO-BMFF box whose brand is `avif`.
+        if (str_starts_with($bytes, 'RIFF') && substr($bytes, 8, 4) === 'WEBP') {
+            return 'image/webp';
+        }
+
+        if (substr($bytes, 4, 4) === 'ftyp' && in_array(substr($bytes, 8, 4), ['avif', 'avis'], true)) {
+            return 'image/avif';
+        }
+
+        // SVG: XML with an <svg> root. The check is on the element name, so a
+        // text file merely mentioning "svg" is not accepted.
+        //
+        // The window has to clear the preamble a real icon carries, not just an
+        // XML declaration: an SVG exported from Illustrator or Figma leads with
+        // a generator comment and a DOCTYPE, which routinely pushes `<svg>` past
+        // the first kilobyte — and that file is exactly the `favicon.svg` this
+        // whole feature exists to store. Bounded rather than unbounded so a
+        // multi-megabyte document is still not fully scanned.
+        if (preg_match('/<svg[\s>]/i', substr($bytes, 0, self::SVG_SNIFF_BYTES)) === 1) {
+            return 'image/svg+xml';
+        }
+
+        return null;
+    }
+
+    /**
+     * How far into a document to look for an `<svg>` root — see sniffImageType().
+     */
+    protected const SVG_SNIFF_BYTES = 8192;
 
     /**
      * Validate a free-text icon name before handing it to Filament. An unknown

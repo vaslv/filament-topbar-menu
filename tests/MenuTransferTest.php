@@ -306,6 +306,99 @@ class MenuTransferTest extends TestCase
         ]);
     }
 
+    public function test_an_embedded_favicon_survives_an_export_import_round_trip(): void
+    {
+        $data = TopbarMenuItem::faviconDataFromBytes(self::PNG);
+
+        TopbarMenuItem::query()->create([
+            'label' => 'Embedded',
+            'url' => 'https://example.com',
+            'favicon_data' => $data,
+        ]);
+
+        $payload = $this->transfer()->export();
+
+        TopbarMenuItem::query()->delete();
+
+        $this->transfer()->import($payload);
+
+        // The icon travels inside the file, which is the point: the export is
+        // portable to an install that cannot reach the original host either.
+        $this->assertSame($data, TopbarMenuItem::query()->where('label', 'Embedded')->firstOrFail()->favicon_data);
+    }
+
+    public function test_import_rejects_an_embedded_favicon_that_is_not_a_whitelisted_image(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[items.0.favicon_data]');
+
+        // An import file is untrusted input whose values land in an <img src>
+        // on every panel page, so the type whitelist applies here too.
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                [
+                    'label' => 'Icon',
+                    'url' => 'https://example.com',
+                    'favicon_data' => 'data:text/html;base64,'.base64_encode('<script>alert(1)</script>'),
+                ],
+            ],
+        ]);
+    }
+
+    public function test_import_rejects_an_embedded_favicon_that_could_break_out_of_the_attribute(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[items.0.favicon_data]');
+
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                [
+                    'label' => 'Icon',
+                    'url' => 'https://example.com',
+                    'favicon_data' => 'data:image/png;base64,"><script>alert(1)</script>',
+                ],
+            ],
+        ]);
+    }
+
+    public function test_import_rejects_an_embedded_favicon_over_the_byte_cap(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[items.0.favicon_data]');
+
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                [
+                    'label' => 'Icon',
+                    'url' => 'https://example.com',
+                    'favicon_data' => 'data:image/png;base64,'.base64_encode(self::PNG),
+                ],
+            ],
+        ]);
+    }
+
+    public function test_import_rejects_a_non_string_embedded_favicon(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[items.0.favicon_data]');
+
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                ['label' => 'Icon', 'url' => 'https://example.com', 'favicon_data' => ['not', 'a', 'string']],
+            ],
+        ]);
+    }
+
     public function test_import_rejects_an_over_length_url(): void
     {
         $this->expectException(InvalidArgumentException::class);

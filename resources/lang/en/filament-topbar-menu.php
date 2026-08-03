@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'Favicon URL',
         ],
+        'favicon_data' => [
+            'label' => 'Embedded favicon',
+            'upload' => 'Upload an icon',
+            'helper' => 'Stored in the menu itself, not on a disk. Use it when the icon is not reachable from every visitor\'s browser — a site behind a login, or an internal-only service. An embedded icon overrides the favicon URL.',
+        ],
         'visibility' => [
             'label' => 'Visible to',
             'placeholder' => 'Everyone',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Fetch favicon',
         'fetch_favicon_tooltip' => 'Resolve the favicon from the URL above',
         'fetch_favicons' => 'Fetch favicons',
+        'embed_favicon' => 'Fetch and embed',
+        'embed_favicon_tooltip' => 'Download the favicon from the URL above and store the image itself',
+        'clear_favicon_data' => 'Remove',
         'export' => 'Export',
         'import' => 'Import',
         'create_table' => 'Create menu table',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon resolved',
+        'favicon_embedded' => 'Favicon downloaded and embedded',
         'favicon_not_found' => 'No favicon found',
+        'favicon_upload_rejected' => 'That file was not stored: it must be an image of at most :size',
         'enter_url_first' => 'Enter an external URL first',
         'favicons_resolved' => ':count favicon(s) resolved',
+        'favicons_overridden' => 'An embedded icon overrides the link on :count item(s) — the topbar keeps showing it.',
         'import_success' => ':count menu item(s) imported',
         'import_invalid' => 'The file is not a valid topbar menu export',
         'cache_flushed' => 'Menu cache flushed',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'Favicon resolution is disabled (filament-topbar-menu.enable_favicons); nothing to do.',
         'nothing_to_refresh' => 'No menu items need a favicon refresh.',
         'not_found' => 'not found',
+        'embedded' => 'embedded (:type)',
         'resolved_summary' => 'Resolved :resolved of :total favicon(s).',
         'table_created' => 'Menu table ":table" created on the ":connection" connection.',
         'table_exists' => 'Menu table ":table" already exists on the ":connection" connection; nothing to do.',
+        'column_added' => 'Column ":column" added to the menu table ":table".',
         'copied' => 'Copied :count menu item(s) from the default connection to ":connection".',
         'copy_skipped_existing' => 'Copy skipped: the menu on ":connection" already has items; not merging this app\'s local menu into it.',
         'copy_skipped_no_dedicated' => 'Copy skipped: no dedicated connection is configured; the menu already lives on the default connection.',

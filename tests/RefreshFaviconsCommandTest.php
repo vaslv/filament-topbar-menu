@@ -87,4 +87,67 @@ class RefreshFaviconsCommandTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_the_embed_option_stores_the_image_instead_of_a_link(): void
+    {
+        Http::fake([
+            '*/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+        ]);
+
+        $item = TopbarMenuItem::create([
+            'label' => 'External',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+        ]);
+
+        $this->artisan('filament-topbar-menu:refresh-favicons --embed')->assertSuccessful();
+
+        $item->refresh();
+
+        $this->assertSame('data:image/png;base64,'.base64_encode(self::PNG), $item->favicon_data);
+
+        // --embed fills its own column; the link one is left as it was, so the
+        // two modes never overwrite each other's work.
+        $this->assertNull($item->favicon_url);
+    }
+
+    public function test_the_embed_option_selects_items_by_the_column_it_fills(): void
+    {
+        Http::fake([
+            '*/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+        ]);
+
+        // Has a link but no embedded icon: --embed without --force must still
+        // pick it up, because the embedded column is what it is filling.
+        $item = TopbarMenuItem::create([
+            'label' => 'Linked already',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'favicon_url' => 'https://example.com/favicon.ico',
+        ]);
+
+        $this->artisan('filament-topbar-menu:refresh-favicons --embed')->assertSuccessful();
+
+        $this->assertNotNull($item->refresh()->favicon_data);
+    }
+
+    public function test_the_embed_option_leaves_items_that_already_carry_one(): void
+    {
+        Http::fake([
+            '*/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+        ]);
+
+        $existing = TopbarMenuItem::create([
+            'label' => 'Embedded already',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com',
+            'favicon_data' => 'data:image/gif;base64,'.base64_encode('kept'),
+        ]);
+
+        $this->artisan('filament-topbar-menu:refresh-favicons --embed')->assertSuccessful();
+
+        $this->assertSame('data:image/gif;base64,'.base64_encode('kept'), $existing->refresh()->favicon_data);
+
+        Http::assertNothingSent();
+    }
 }

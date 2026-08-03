@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'URL della favicon',
         ],
+        'favicon_data' => [
+            'label' => 'Favicon incorporata',
+            'upload' => 'Carica un\'icona',
+            'helper' => 'Salvata nel menu stesso, non su disco. Da usare quando l\'icona non è raggiungibile dal browser di ogni visitatore — un sito protetto da login o un servizio solo interno. Un\'icona incorporata ha la precedenza sull\'URL della favicon.',
+        ],
         'visibility' => [
             'label' => 'Visibile a',
             'placeholder' => 'Tutti',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Recupera favicon',
         'fetch_favicon_tooltip' => 'Determina la favicon dall\'URL sopra indicato',
         'fetch_favicons' => 'Recupera favicon',
+        'embed_favicon' => 'Recupera e incorpora',
+        'embed_favicon_tooltip' => 'Scarica la favicon dall\'URL sopra e salva l\'immagine stessa',
+        'clear_favicon_data' => 'Rimuovi',
         'export' => 'Esporta',
         'import' => 'Importa',
         'create_table' => 'Crea tabella del menu',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon individuata',
+        'favicon_embedded' => 'Favicon scaricata e incorporata',
         'favicon_not_found' => 'Nessuna favicon trovata',
+        'favicon_upload_rejected' => 'File non salvato: deve essere un\'immagine di al massimo :size',
         'enter_url_first' => 'Inserisci prima un URL esterno',
         'favicons_resolved' => ':count favicon individuate',
+        'favicons_overridden' => 'Per :count elemento/i un’icona incorporata ha la precedenza sul link — la topbar continua a mostrarla.',
         'import_success' => ':count voci di menu importate',
         'import_invalid' => 'Il file non è un\'esportazione valida del menu superiore',
         'cache_flushed' => 'Cache del menu svuotata',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'La risoluzione delle favicon è disattivata (filament-topbar-menu.enable_favicons); niente da fare.',
         'nothing_to_refresh' => 'Nessuna voce di menu richiede l\'aggiornamento della favicon.',
         'not_found' => 'non trovata',
+        'embedded' => 'incorporata (:type)',
         'resolved_summary' => 'Individuate :resolved favicon su :total.',
         'table_created' => 'La tabella del menu ":table" è stata creata sulla connessione ":connection".',
         'table_exists' => 'La tabella del menu ":table" esiste già sulla connessione ":connection"; niente da fare.',
+        'column_added' => 'Colonna ":column" aggiunta alla tabella del menu ":table".',
         'copied' => 'Copiate :count voci di menu dalla connessione predefinita a ":connection".',
         'copy_skipped_existing' => 'Copia saltata: il menu su ":connection" contiene già delle voci; il menu locale di questa app non viene unito.',
         'copy_skipped_no_dedicated' => 'Copia saltata: nessuna connessione dedicata configurata; il menu si trova già sulla connessione predefinita.',

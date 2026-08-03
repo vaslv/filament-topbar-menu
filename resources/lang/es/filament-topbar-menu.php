@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'URL del favicon',
         ],
+        'favicon_data' => [
+            'label' => 'Favicon incrustado',
+            'upload' => 'Subir un icono',
+            'helper' => 'Se guarda en el propio menú, no en un disco. Úsalo cuando el icono no sea accesible desde el navegador de cada visitante: un sitio detrás de un inicio de sesión o un servicio solo interno. Un icono incrustado prevalece sobre la URL del favicon.',
+        ],
         'visibility' => [
             'label' => 'Visible para',
             'placeholder' => 'Todos',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Obtener favicon',
         'fetch_favicon_tooltip' => 'Resolver el favicon a partir de la URL de arriba',
         'fetch_favicons' => 'Obtener favicons',
+        'embed_favicon' => 'Obtener e incrustar',
+        'embed_favicon_tooltip' => 'Descargar el favicon de la URL anterior y guardar la propia imagen',
+        'clear_favicon_data' => 'Eliminar',
         'export' => 'Exportar',
         'import' => 'Importar',
         'create_table' => 'Crear tabla del menú',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon resuelto',
+        'favicon_embedded' => 'Favicon descargado e incrustado',
         'favicon_not_found' => 'No se encontró ningún favicon',
+        'favicon_upload_rejected' => 'El archivo no se guardó: debe ser una imagen de como máximo :size',
         'enter_url_first' => 'Introduce primero una URL externa',
         'favicons_resolved' => ':count favicon(s) resuelto(s)',
+        'favicons_overridden' => 'En :count elemento(s) un icono incrustado prevalece sobre el enlace: la barra sigue mostrándolo.',
         'import_success' => ':count elemento(s) de menú importado(s)',
         'import_invalid' => 'El archivo no es una exportación de menú válida',
         'cache_flushed' => 'Caché del menú vaciada',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'La resolución de favicons está desactivada (filament-topbar-menu.enable_favicons); nada que hacer.',
         'nothing_to_refresh' => 'Ningún elemento del menú necesita actualizar su favicon.',
         'not_found' => 'no encontrado',
+        'embedded' => 'incrustado (:type)',
         'resolved_summary' => 'Resueltos :resolved de :total favicon(s).',
         'table_created' => 'La tabla del menú «:table» se creó en la conexión «:connection».',
         'table_exists' => 'La tabla del menú «:table» ya existe en la conexión «:connection»; nada que hacer.',
+        'column_added' => 'Columna ":column" añadida a la tabla del menú ":table".',
         'copied' => 'Se copiaron :count elemento(s) del menú desde la conexión predeterminada a «:connection».',
         'copy_skipped_existing' => 'Copia omitida: el menú en «:connection» ya tiene elementos; no se fusiona el menú local de esta aplicación.',
         'copy_skipped_no_dedicated' => 'Copia omitida: no hay una conexión dedicada configurada; el menú ya vive en la conexión predeterminada.',

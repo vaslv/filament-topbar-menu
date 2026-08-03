@@ -42,6 +42,18 @@ class CreateTableCommand extends Command
             ],
         ));
 
+        // ensure() only ever creates a whole table, so on an existing one it
+        // returns without touching the schema. This command exists precisely
+        // for the installs where `migrate` is not the route the schema arrives
+        // by, so every later column has to be applied here too — otherwise the
+        // command that promises the package's table leaves it a version behind.
+        if ($schema->addFaviconData()) {
+            $this->components->info(__('filament-topbar-menu::filament-topbar-menu.command.column_added', [
+                'column' => 'favicon_data',
+                'table' => $schema->table(),
+            ]));
+        }
+
         if (! $this->option('copy-from-default')) {
             return self::SUCCESS;
         }

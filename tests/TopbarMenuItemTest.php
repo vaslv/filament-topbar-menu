@@ -510,4 +510,199 @@ class TopbarMenuItemTest extends TestCase
         $this->assertNull(TopbarMenuItem::safeIconName(''));
         $this->assertNull(TopbarMenuItem::safeIconName('not-a-real-icon-xyz'));
     }
+
+    public function test_display_icon_prefers_an_embedded_favicon_over_the_url(): void
+    {
+        $data = TopbarMenuItem::faviconDataFromBytes(self::PNG);
+
+        $item = new TopbarMenuItem([
+            'favicon_url' => 'https://example.com/favicon.ico',
+            'favicon_data' => $data,
+            'icon' => 'heroicon-o-home',
+        ]);
+
+        // The embedded copy exists precisely because the URL is not reachable
+        // from every visitor's browser; preferring the link would put back the
+        // broken image it was stored to avoid.
+        $this->assertSame($data, $item->displayIcon());
+    }
+
+    public function test_display_icon_falls_back_when_the_embedded_favicon_is_not_renderable(): void
+    {
+        // A fleet-shared menu table, a seeder or hand-written SQL can put
+        // anything in the column; the value goes into an <img src>, so it is
+        // validated on the way out and not merely on the way in.
+        foreach ([
+            'javascript:alert(1)',
+            'data:text/html;base64,'.base64_encode('<script>alert(1)</script>'),
+            'data:image/png,%3Cscript%3E',
+            'data:image/png;base64,"><script>alert(1)</script>',
+            'not a data uri at all',
+        ] as $stored) {
+            $item = new TopbarMenuItem([
+                'favicon_url' => 'https://example.com/favicon.ico',
+                'favicon_data' => $stored,
+            ]);
+
+            $this->assertSame('https://example.com/favicon.ico', $item->displayIcon());
+        }
+    }
+
+    public function test_an_embedded_favicon_over_the_cap_is_not_rendered(): void
+    {
+        $data = TopbarMenuItem::faviconDataFromBytes(self::PNG);
+
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        $item = new TopbarMenuItem(['favicon_data' => $data, 'icon' => 'heroicon-o-home']);
+
+        // Lowering the cap must take effect for values already stored — the cap
+        // protects the cached snapshot, which is rebuilt from what is rendered.
+        $this->assertSame('heroicon-o-home', $item->displayIcon());
+    }
+
+    public function test_favicon_data_is_built_from_the_bytes_not_from_a_claimed_type(): void
+    {
+        $this->assertSame(
+            'data:image/png;base64,'.base64_encode(self::PNG),
+            TopbarMenuItem::faviconDataFromBytes(self::PNG),
+        );
+
+        $svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>';
+
+        $this->assertSame(
+            'data:image/svg+xml;base64,'.base64_encode($svg),
+            TopbarMenuItem::faviconDataFromBytes($svg),
+        );
+
+        // Not an image in any format the whitelist covers.
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes('<html><body>hi</body></html>'));
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes(''));
+    }
+
+    public function test_favicon_data_refuses_bytes_over_the_cap(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes(self::PNG));
+    }
+
+    public function test_the_byte_cap_falls_back_when_configured_with_nonsense(): void
+    {
+        foreach ([null, 0, -1, 'huge', []] as $configured) {
+            config()->set('filament-topbar-menu.favicon_max_bytes', $configured);
+
+            $this->assertSame(TopbarMenuItem::FAVICON_MAX_BYTES_DEFAULT, TopbarMenuItem::faviconMaxBytes());
+        }
+    }
+
+    public function test_the_byte_cap_is_clamped_to_what_the_column_can_hold(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', 64 * 1024 * 1024);
+
+        // `favicon_data` is mediumText holding base64, so a decoded image past
+        // ~12.58 MB cannot fit. Honouring a larger configured value would mean
+        // MySQL truncating the icon silently in non-strict mode.
+        $this->assertSame(12582911, TopbarMenuItem::faviconMaxBytes());
+        $this->assertLessThan(16777215, TopbarMenuItem::faviconMaxBytes() / 3 * 4);
+    }
+
+    public function test_the_byte_cap_is_inclusive_and_both_checks_agree_on_the_edge(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG));
+
+        $data = TopbarMenuItem::faviconDataFromBytes(self::PNG);
+
+        // Exactly at the cap is stored — and what the writer stores the render
+        // path must accept, or the item silently loses its icon.
+        $this->assertNotNull($data);
+        $this->assertTrue(TopbarMenuItem::isStorableFaviconData($data));
+
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes(self::PNG));
+        $this->assertFalse(TopbarMenuItem::isStorableFaviconData($data));
+    }
+
+    public function test_a_real_ico_keeps_its_own_type(): void
+    {
+        $ico = self::ico();
+
+        // `favicon.ico` is the first location the resolver probes and the
+        // commonest icon on the web, so the sniffer has to read the real
+        // format — PHP reports it as image/vnd.microsoft.icon, not image/x-icon.
+        $this->assertSame(
+            'data:image/vnd.microsoft.icon;base64,'.base64_encode($ico),
+            TopbarMenuItem::faviconDataFromBytes($ico),
+        );
+
+        $this->assertTrue(TopbarMenuItem::isStorableFaviconData(TopbarMenuItem::faviconDataFromBytes($ico)));
+    }
+
+    public function test_an_svg_whose_root_sits_past_a_long_preamble_is_still_recognised(): void
+    {
+        $svg = self::svgWithLongPreamble();
+
+        // An SVG exported from a design tool leads with a generator comment and
+        // a DOCTYPE, which pushes <svg> well past the first kilobyte. That file
+        // is exactly the `favicon.svg` this feature exists to store, so a sniff
+        // window that stopped short would refuse the main case.
+        $this->assertGreaterThan(1024, strpos($svg, '<svg'));
+        $this->assertSame(
+            'data:image/svg+xml;base64,'.base64_encode($svg),
+            TopbarMenuItem::faviconDataFromBytes($svg),
+        );
+    }
+
+    public function test_a_document_that_only_mentions_svg_is_not_treated_as_one(): void
+    {
+        // The sniff is on the element, not the word — a text file talking about
+        // SVG must not become an icon.
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes(
+            'This file explains the svg format and how svg icons are exported.',
+        ));
+    }
+
+    public function test_the_container_signatures_cover_webp_and_avif(): void
+    {
+        $vp8l = "\x2f".str_repeat("\x00", 24);
+        $webp = 'RIFF'.pack('V', 12 + strlen($vp8l)).'WEBP'.'VP8L'.pack('V', strlen($vp8l)).$vp8l;
+
+        $this->assertSame('data:image/webp;base64,'.base64_encode($webp), TopbarMenuItem::faviconDataFromBytes($webp));
+
+        // getimagesizefromstring() has no AVIF parser, so the brand check is
+        // the only thing keeping a whitelisted format usable.
+        $avif = pack('N', 32).'ftyp'.'avif'.pack('N', 0).'avifmif1miaf'.str_repeat("\x00", 40);
+
+        $this->assertSame('data:image/avif;base64,'.base64_encode($avif), TopbarMenuItem::faviconDataFromBytes($avif));
+
+        // A brand this package does not claim must not be relabelled.
+        $this->assertNull(TopbarMenuItem::faviconDataFromBytes(pack('N', 24).'ftyp'.'isom'.pack('N', 0).'isomiso2'));
+    }
+
+    public function test_an_embedded_favicon_with_a_trailing_newline_is_refused(): void
+    {
+        // PCRE's `$` also matches before a final newline, so the gate is
+        // anchored with `\z` — otherwise a value with trailing whitespace would
+        // reach an <img src> / CSS url('…') sink that has no use for it.
+        $this->assertFalse(TopbarMenuItem::isStorableFaviconData(
+            'data:image/png;base64,'.base64_encode(self::PNG)."\n",
+        ));
+    }
+
+    public function test_an_oversized_value_is_refused_without_scanning_it_all(): void
+    {
+        $junk = 'data:image/png;base64,'.str_repeat('A', 4 * 1024 * 1024);
+
+        $start = microtime(true);
+        $storable = TopbarMenuItem::isStorableFaviconData($junk);
+        $elapsed = (microtime(true) - $start) * 1000;
+
+        $this->assertFalse($storable);
+
+        // This runs on every render of every item against an untrusted column,
+        // so the length has to be rejected in constant time rather than after a
+        // full regex scan and a multi-megabyte decode.
+        $this->assertLessThan(1.0, $elapsed, 'Oversized values must be refused by length, not by scanning.');
+    }
 }

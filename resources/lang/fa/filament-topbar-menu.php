@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'آدرس فاوآیکون',
         ],
+        'favicon_data' => [
+            'label' => 'فاوآیکون تعبیه‌شده',
+            'upload' => 'بارگذاری آیکون',
+            'helper' => 'در خودِ منو ذخیره می‌شود، نه روی دیسک. زمانی از آن استفاده کنید که آیکون از مرورگر همهٔ بازدیدکنندگان در دسترس نیست — سایتی پشت ورود به حساب یا سرویسی صرفاً داخلی. آیکون تعبیه‌شده بر آدرس فاوآیکون اولویت دارد.',
+        ],
         'visibility' => [
             'label' => 'قابل مشاهده برای',
             'placeholder' => 'همه',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'دریافت فاوآیکون',
         'fetch_favicon_tooltip' => 'تشخیص فاوآیکون از URL بالا',
         'fetch_favicons' => 'دریافت فاوآیکون‌ها',
+        'embed_favicon' => 'دریافت و تعبیه',
+        'embed_favicon_tooltip' => 'دریافت فاوآیکون از آدرس بالا و ذخیرهٔ خودِ تصویر',
+        'clear_favicon_data' => 'حذف',
         'export' => 'برون‌بری',
         'import' => 'درون‌ریزی',
         'create_table' => 'ایجاد جدول منو',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'فاوآیکون تشخیص داده شد',
+        'favicon_embedded' => 'فاوآیکون دریافت و تعبیه شد',
         'favicon_not_found' => 'فاوآیکونی یافت نشد',
+        'favicon_upload_rejected' => 'فایل ذخیره نشد: باید تصویری با حجم حداکثر :size باشد',
         'enter_url_first' => 'ابتدا یک URL خارجی وارد کنید',
         'favicons_resolved' => ':count فاوآیکون تشخیص داده شد',
+        'favicons_overridden' => 'در :count مورد، آیکون تعبیه‌شده بر پیوند اولویت دارد — نوار بالا همان را نشان می‌دهد.',
         'import_success' => ':count آیتم منو درون‌ریزی شد',
         'import_invalid' => 'این فایل یک برون‌بری معتبر از منوی نوار بالا نیست',
         'cache_flushed' => 'حافظهٔ نهان منو پاک شد',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'تشخیص فاوآیکون غیرفعال است (filament-topbar-menu.enable_favicons)؛ کاری برای انجام نیست.',
         'nothing_to_refresh' => 'هیچ آیتم منویی به تازه‌سازی فاوآیکون نیاز ندارد.',
         'not_found' => 'یافت نشد',
+        'embedded' => 'تعبیه شد (:type)',
         'resolved_summary' => ':resolved از :total فاوآیکون تشخیص داده شد.',
         'table_created' => 'جدول منو «:table» روی اتصال «:connection» ایجاد شد.',
         'table_exists' => 'جدول منو «:table» از قبل روی اتصال «:connection» وجود دارد؛ کاری برای انجام نیست.',
+        'column_added' => 'ستون ":column" به جدول منوی ":table" افزوده شد.',
         'copied' => ':count آیتم منو از اتصال پیش‌فرض به «:connection» کپی شد.',
         'copy_skipped_existing' => 'کپی انجام نشد: منوی روی «:connection» از قبل آیتم دارد؛ منوی محلی این برنامه با آن ادغام نمی‌شود.',
         'copy_skipped_no_dedicated' => 'کپی انجام نشد: اتصال اختصاصی پیکربندی نشده است؛ منو از قبل روی اتصال پیش‌فرض قرار دارد.',

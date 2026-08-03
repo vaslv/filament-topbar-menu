@@ -73,15 +73,30 @@ return [
     |
     | `favicon_request_timeout` is the timeout in seconds of a SINGLE outbound
     | request, not of resolving one item: resolving fetches the linked page, then
-    | up to five icons it declares, then favicon.ico in the link's own directory
-    | and at the host root — each of which may follow redirects — so the worst
-    | case for one item is a multiple of this value.
+    | up to five icons it declares, then favicon.ico / favicon.svg / favicon.png
+    | in the link's own directory and at the host root — each of which may follow
+    | redirects — so the worst case for one item is a multiple of this value.
+    |
+    | A favicon can also be stored as the image ITSELF, in the `favicon_data`
+    | column, instead of as a link — upload one in the form, or use the "Embed"
+    | actions and the command's --embed flag. That is the option for links whose
+    | icon the visitor's browser cannot fetch (a host behind HTTP auth, an
+    | internal-only service, a site that blocks hotlinking): a stored link would
+    | render as a broken image for everyone, while an embedded copy renders for
+    | everyone and stops the panel from reaching third-party hosts on every page
+    | load. An embedded icon wins over `favicon_url` when both are set.
+    |
+    | `favicon_max_bytes` caps the DECODED image. The cap guards the menu cache
+    | more than the database: the cached snapshot carries every item's
+    | attributes, so an oversized icon is paid for on each rebuild.
     |
     */
 
     'enable_favicons' => true,
 
     'favicon_request_timeout' => 5,
+
+    'favicon_max_bytes' => 65536,
 
     /*
     |--------------------------------------------------------------------------

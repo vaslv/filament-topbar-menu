@@ -31,6 +31,9 @@ class MenuTransfer
      * Reject over-length imported values up front rather than letting the
      * database truncate them silently (MySQL non-strict) or throw a raw driver
      * exception (MySQL strict) that the import action cannot report cleanly.
+     *
+     * `favicon_data` is exempt — it is a mediumText column holding an embedded
+     * image, bounded by `favicon_max_bytes` instead.
      */
     protected const MAX_STRING_LENGTH = 255;
 
@@ -157,6 +160,7 @@ class MenuTransfer
                 'target' => $item->target,
                 'icon' => $item->icon,
                 'favicon_url' => $item->favicon_url,
+                'favicon_data' => $item->favicon_data,
                 'is_active' => $item->is_active,
                 'sort' => $item->sort,
                 'visibility' => $item->visibility,
@@ -239,6 +243,26 @@ class MenuTransfer
 
             if (filled($item['favicon_url'] ?? null) && ! $this->isStorableFaviconUrl($item['favicon_url'])) {
                 throw new InvalidArgumentException("[{$itemPath}.favicon_url] must be a http(s) URL without quotes, angle brackets or whitespace.");
+            }
+
+            // An embedded icon is not length-checked with the VARCHAR fields
+            // above — it is a `data:` URI in a mediumText column, thousands of
+            // characters by nature. What it IS checked for is everything that
+            // makes it renderable: a whitelisted image type, decodable base64,
+            // and the configured byte cap. The file is untrusted input that ends
+            // up in an <img src> on every panel page, so this is the same
+            // guarantee the upload and the resolver enforce on the way in.
+            $faviconData = $item['favicon_data'] ?? null;
+
+            if ($faviconData !== null && ! is_string($faviconData)) {
+                throw new InvalidArgumentException("[{$itemPath}.favicon_data] must be a string or null.");
+            }
+
+            if (filled($faviconData) && ! TopbarMenuItem::isStorableFaviconData($faviconData)) {
+                throw new InvalidArgumentException(
+                    "[{$itemPath}.favicon_data] must be a base64 data: URI of an image of at most "
+                    .TopbarMenuItem::faviconMaxBytes().' bytes.',
+                );
             }
 
             $this->validateRouteParameters($item['route_parameters'] ?? null, "{$itemPath}.route_parameters");
@@ -393,6 +417,7 @@ class MenuTransfer
                 'target' => $item['target'] ?? TopbarMenuItem::TARGET_SELF,
                 'icon' => $item['icon'] ?? null,
                 'favicon_url' => $item['favicon_url'] ?? null,
+                'favicon_data' => $item['favicon_data'] ?? null,
                 'is_active' => $item['is_active'] ?? true,
                 'sort' => $item['sort'] ?? 0,
                 'visibility' => $item['visibility'] ?? null,

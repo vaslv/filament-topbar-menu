@@ -5,6 +5,116 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0]
+
+### Added
+
+- **A favicon can now be stored as the image itself, not only as a link.** A
+  favicon URL is fetched by every *visitor's* browser, once per item, on every
+  panel page — which works for a public site and fails for everything else: a
+  service behind a login answers `401` to a user who is not signed into it, an
+  internal-only host does not answer at all, and the menu shows a broken image.
+  The new `favicon_data` column holds the icon's own bytes as a `data:` URI, so
+  nothing is fetched at render time by anyone. No file storage is involved — the
+  icon lives in the menu row, survives a redeploy on a container with no
+  persistent disk, travels through export/import and rides along in the cached
+  snapshot. An embedded icon overrides `favicon_url` when both are set.
+  - **In the form:** an "Upload an icon" field — the only route to a favicon
+    behind HTTP Basic auth, where the resolver cannot reach the file either —
+    with a "Fetch and embed" button that downloads what the resolver finds.
+  - **In the items table:** nothing. Embedding deliberately has no bulk action —
+    an embedded icon may be one an admin uploaded by hand, nothing can re-fetch
+    it, and one click that overwrites a selection of them only opens one way.
+    The existing "Fetch favicons" bulk action still stores links, and now says
+    when an item it resolved keeps showing its embedded icon instead.
+  - **On the command:** `--embed`. It fills `favicon_data` and reads the same
+    column to decide which items still need one, so the two modes never
+    overwrite each other's work.
+  - **New config option** `favicon_max_bytes` (default 64 KB), capping the
+    decoded image. The cap guards the cached snapshot more than the database,
+    since the snapshot carries every item's attributes and is rebuilt on a miss.
+  - **New migration** `add_favicon_data_to_filament_topbar_menu_items_table`,
+    which existing installs need — the create migration is already recorded as
+    ran there and never alters an existing table. It is idempotent and race-safe,
+    so a menu database shared by several apps is fine.
+  - Only whitelisted image types are stored or rendered (PNG, JPEG, GIF, WebP,
+    AVIF, BMP, ICO, SVG), and the type is sniffed from the **bytes** rather than
+    taken from a remote host's `Content-Type` or an upload's file name. The check
+    runs on write *and* on render, so a row written by a sibling app on a shared
+    menu table, a seeder or hand-written SQL cannot put something unrenderable
+    into every panel page. Import applies the same rules to an untrusted file.
+
+### Changed
+
+- **`FaviconResolver`'s internals changed shape for subclasses.** The search now
+  returns the bytes alongside the URL, so embedding does not download an icon a
+  second time: `resolveFromHtml()` returns `array{url, body}` instead of `?string`,
+  the new `locate()` does the same for the whole search, and `isValidFavicon()`
+  is gone — `fetchFavicon()` replaces it, returning the body or null. Anything
+  overriding those methods needs updating; `resolve()` itself is unchanged.
+- **The import file size limit is 16 MB, up from 2 MB.** An embedded favicon
+  travels inside the export as base64, so a menu of embedded icons is orders of
+  magnitude larger than a menu of links — the old limit would have rejected a
+  file this very panel had just exported.
+- **`filament-topbar-menu:create-table` now also applies later columns**, not
+  just the initial table. It exists for installs where `migrate` is not how the
+  schema arrives, so creating the table was only half the job.
+
+### Fixed
+
+- **Declared icons are ranked by `rel`, not by the order the page lists them
+  in.** A page commonly declares its `apple-touch-icon` first — a 180×180
+  home-screen tile, several times the bytes of the real icon, and not what a
+  topbar renders at ~16px. `icon` / `shortcut icon` now wins, then
+  `apple-touch-icon`, then everything else; a lower-ranked icon is still used
+  when it is all the page has.
+- **Embedding no longer gives up on the first unusable candidate.** "Too big to
+  store" and "not a format we render" are different answers from "this site has
+  no icon", so the search now continues through the remaining declared icons and
+  into the conventional locations. Storing a *link* is unaffected by the byte
+  cap, as before.
+- **An SVG whose root element sits past the first kilobyte is now recognised.**
+  The type sniffer looked for `<svg` in the first 1024 bytes, but a file exported
+  from Illustrator or Figma leads with a generator comment and a DOCTYPE that
+  routinely push `<svg>` past that — so the format the whole feature exists to
+  store was refused as "not an image". The window is 8 KB now.
+- **An embedded favicon with trailing whitespace is refused.** PCRE's `$` also
+  matches before a final newline, so `…;base64,AAAA\n` passed the gate and
+  reached an `<img src>` / CSS `url('…')` sink that has no use for it.
+- **An oversized value is rejected by length, in constant time.** The gate runs
+  on every render of every item against a column the package treats as
+  untrusted, and it used to reach a full anchored regex scan plus a
+  multi-megabyte base64 decode before applying the cap.
+- **The form's `favicon_data` is validated on the way in, not only on the way
+  out.** A Hidden field's state is client-controlled, so a panel user could
+  write any string — uncapped — into the column that rides inside the cached
+  menu snapshot. Render-time validation kept it off the page; nothing kept it
+  out of the database.
+- **Removing an uploaded icon clears it.** Filament runs the same hook after
+  unsetting the file, and the hook bailed out on the empty state — so the icon
+  the admin had just removed stayed stored and stayed in the topbar.
+- **`favicon_max_bytes` is clamped to what the column can hold** (12.58 MB
+  decoded, the mediumText capacity once base64 inflates it). A larger configured
+  value meant MySQL silently truncating the icon in non-strict mode.
+- **The `favicon_data` migration runs outside a transaction.** PostgreSQL aborts
+  the whole transaction on a duplicate-column error, so the race-recovery
+  re-check would itself have thrown instead of no-oping.
+- **The favicon resolver no longer misses sites that ship only a `favicon.svg`
+  (or `.png`).** When a page declares nothing the resolver can read — the icon
+  is inserted from JavaScript, or the page is behind auth and answers
+  `401`/`403` — resolution falls back to guessing at conventional locations, and
+  that guess was `favicon.ico` alone. A modern site commonly serves
+  `favicon.svg` and nothing else, so those items stored no favicon at all. Each
+  candidate directory (the link's own, then the host root) is now probed for
+  `favicon.ico`, `favicon.svg` and `favicon.png`, in that order, keeping the
+  existing preference for the link's own directory over the host root.
+- **An icon declared with unquoted attributes is now read.** `<link rel=icon
+  href=/favicon.svg>` is valid HTML and is what an HTML minifier emits, but the
+  parser insisted on quotes and skipped such a tag — falling through to guessing
+  at file names on a page that had said exactly where its icon was. The same
+  applies to an unquoted `<base href>`. Attribute names are matched on their own
+  boundary while reading, so `data-href` is not mistaken for `href`.
+
 ## [1.10.1]
 
 ### Security

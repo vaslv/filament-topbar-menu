@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => '网站图标 URL',
         ],
+        'favicon_data' => [
+            'label' => '内嵌网站图标',
+            'upload' => '上传图标',
+            'helper' => '保存在菜单本身，而非磁盘上。当图标无法从每位访问者的浏览器访问时使用——例如需要登录的站点或仅限内部的服务。内嵌图标优先于网站图标 URL。',
+        ],
         'visibility' => [
             'label' => '可见范围',
             'placeholder' => '所有人',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => '获取网站图标',
         'fetch_favicon_tooltip' => '根据上方的 URL 解析网站图标',
         'fetch_favicons' => '获取网站图标',
+        'embed_favicon' => '获取并内嵌',
+        'embed_favicon_tooltip' => '从上方 URL 下载网站图标并保存图片本身',
+        'clear_favicon_data' => '移除',
         'export' => '导出',
         'import' => '导入',
         'create_table' => '创建菜单表',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => '网站图标已解析',
+        'favicon_embedded' => '网站图标已下载并内嵌',
         'favicon_not_found' => '未找到网站图标',
+        'favicon_upload_rejected' => '文件未保存：必须是不超过 :size 的图片',
         'enter_url_first' => '请先输入外部 URL',
         'favicons_resolved' => '已解析 :count 个网站图标',
+        'favicons_overridden' => '有 :count 个菜单项的内嵌图标优先于链接，顶栏仍会显示内嵌图标。',
         'import_success' => '已导入 :count 个菜单项',
         'import_invalid' => '该文件不是有效的顶栏菜单导出文件',
         'cache_flushed' => '菜单缓存已清除',
@@ -133,9 +144,11 @@ return [
         'disabled' => '网站图标解析已禁用（filament-topbar-menu.enable_favicons），无事可做。',
         'nothing_to_refresh' => '没有需要刷新网站图标的菜单项。',
         'not_found' => '未找到',
+        'embedded' => '已内嵌（:type）',
         'resolved_summary' => '已解析 :resolved / :total 个网站图标。',
         'table_created' => '菜单表 “:table” 已在 “:connection” 连接上创建。',
         'table_exists' => '菜单表 “:table” 已存在于 “:connection” 连接上，无需操作。',
+        'column_added' => '已向菜单表 ":table" 添加列 ":column"。',
         'copied' => '已从默认连接复制 :count 个菜单项到 “:connection”。',
         'copy_skipped_existing' => '已跳过复制：“:connection” 上的菜单已有菜单项，不会合并本应用的本地菜单。',
         'copy_skipped_no_dedicated' => '已跳过复制：未配置专用连接，菜单已位于默认连接上。',

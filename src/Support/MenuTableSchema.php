@@ -75,6 +75,11 @@ class MenuTableSchema
                 $table->string('target')->default('_self');
                 $table->string('icon')->nullable();
                 $table->string('favicon_url')->nullable();
+                // The icon's own bytes as a `data:` URI, for menus whose links
+                // the visitor's browser cannot fetch — see addFaviconData().
+                // mediumText, not text: base64 inflates by a third, and MySQL's
+                // TEXT tops out at 64 KB, right where the byte cap sits.
+                $table->mediumText('favicon_data')->nullable();
                 $table->boolean('is_active')->default(true);
                 $table->integer('sort')->default(0);
                 $table->json('visibility')->nullable();
@@ -90,6 +95,49 @@ class MenuTableSchema
             // re-check uses a fresh builder: the earlier hasTable() answer is
             // stale by definition here.
             if (Schema::connection($this->connection())->hasTable($tableName)) {
+                return false;
+            }
+
+            throw $e;
+        }
+
+        return true;
+    }
+
+    /**
+     * Add the `favicon_data` column to an existing menu table. Returns true when
+     * this call added it.
+     *
+     * Separate from ensure() because that one only ever creates a whole table:
+     * on an install that already has the menu, `hasTable()` is true and nothing
+     * inside the closure runs. Both the column's own migration and the
+     * create-table command call this, so a table created fresh and one upgraded
+     * in place end up with the same columns and types — the same contract
+     * ensure() has with that command. (Only the ordinal position can differ:
+     * `after()` is a MySQL-only modifier, so on PostgreSQL and SQLite an
+     * upgraded table carries the column last. Nothing here reads by position.)
+     *
+     * Idempotent by the same reasoning ensure() is: several apps may share one
+     * menu database and each records the migration separately.
+     */
+    public function addFaviconData(): bool
+    {
+        $tableName = $this->table();
+        $schema = Schema::connection($this->connection());
+
+        if (! $schema->hasTable($tableName) || $schema->hasColumn($tableName, 'favicon_data')) {
+            return false;
+        }
+
+        try {
+            $schema->table($tableName, function (Blueprint $table): void {
+                $table->mediumText('favicon_data')->nullable()->after('favicon_url');
+            });
+        } catch (QueryException $e) {
+            // Lost a race with a sibling app against the same shared database.
+            // The column being there is the desired end state, so only a column
+            // that genuinely failed to appear is an error worth rethrowing.
+            if (Schema::connection($this->connection())->hasColumn($tableName, 'favicon_data')) {
                 return false;
             }
 

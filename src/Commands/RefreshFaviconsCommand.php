@@ -11,7 +11,8 @@ class RefreshFaviconsCommand extends Command
 {
     protected $signature = 'filament-topbar-menu:refresh-favicons
         {--id=* : Only refresh the menu items with the given IDs}
-        {--force : Refresh favicons for items that already have one}';
+        {--force : Refresh favicons for items that already have one}
+        {--embed : Store the icon itself in the record instead of a link to it}';
 
     protected $description = 'Resolve and store favicons for external topbar menu links';
 
@@ -25,6 +26,13 @@ class RefreshFaviconsCommand extends Command
             return self::SUCCESS;
         }
 
+        // --embed stores the icon's own bytes in `favicon_data` instead of a
+        // link in `favicon_url`, for links whose icon a visitor's browser
+        // cannot fetch. The column it fills is also the column that decides
+        // which items still need one.
+        $embed = (bool) $this->option('embed');
+        $column = $embed ? 'favicon_data' : 'favicon_url';
+
         $query = TopbarMenuItem::query()
             ->where('type', TopbarMenuItem::TYPE_URL)
             ->whereNotNull('url');
@@ -34,7 +42,7 @@ class RefreshFaviconsCommand extends Command
         }
 
         if (! $this->option('force')) {
-            $query->whereNull('favicon_url');
+            $query->whereNull($column);
         }
 
         $items = $query->get();
@@ -53,7 +61,9 @@ class RefreshFaviconsCommand extends Command
         );
 
         foreach ($items as $item) {
-            $favicon = $resolver->resolve($item->url);
+            $favicon = $embed
+                ? $resolver->resolveEmbedded($item->url)
+                : $resolver->resolve($item->url);
 
             // Escape the admin-controlled label (and the favicon) before they
             // reach the console: a stored value containing `<`/`>` would
@@ -67,10 +77,16 @@ class RefreshFaviconsCommand extends Command
                 continue;
             }
 
-            $item->forceFill(['favicon_url' => $favicon])->save();
+            $item->forceFill([$column => $favicon])->save();
             $resolved++;
 
-            $this->components->twoColumnDetail($label, OutputFormatter::escape($favicon));
+            // An embedded icon is thousands of base64 characters — report what
+            // was stored, not the payload itself.
+            $this->components->twoColumnDetail($label, $embed
+                ? OutputFormatter::escape(__('filament-topbar-menu::filament-topbar-menu.command.embedded', [
+                    'type' => $this->embeddedType($favicon),
+                ]))
+                : OutputFormatter::escape($favicon));
         }
 
         $this->components->info(__('filament-topbar-menu::filament-topbar-menu.command.resolved_summary', [
@@ -79,5 +95,14 @@ class RefreshFaviconsCommand extends Command
         ]));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The image type of an embedded favicon, for the console line that stands
+     * in for the payload.
+     */
+    protected function embeddedType(string $data): string
+    {
+        return str($data)->after('data:')->before(';')->toString();
     }
 }

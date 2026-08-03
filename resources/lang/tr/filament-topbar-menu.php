@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'Favicon URL\'si',
         ],
+        'favicon_data' => [
+            'label' => 'Gömülü favicon',
+            'upload' => 'Simge yükle',
+            'helper' => 'Bir diskte değil, menünün kendisinde saklanır. Simgeye her ziyaretçinin tarayıcısından erişilemediğinde kullanın — oturum açma arkasındaki bir site ya da yalnızca dahili bir servis. Gömülü simge, favicon URL\'sine göre önceliklidir.',
+        ],
         'visibility' => [
             'label' => 'Kimlere görünür',
             'placeholder' => 'Herkes',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Favicon getir',
         'fetch_favicon_tooltip' => 'Yukarıdaki URL\'den favicon\'u çözümle',
         'fetch_favicons' => 'Favicon\'ları getir',
+        'embed_favicon' => 'Getir ve göm',
+        'embed_favicon_tooltip' => 'Yukarıdaki URL\'den favicon\'u indir ve görselin kendisini sakla',
+        'clear_favicon_data' => 'Kaldır',
         'export' => 'Dışa aktar',
         'import' => 'İçe aktar',
         'create_table' => 'Menü tablosunu oluştur',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon çözümlendi',
+        'favicon_embedded' => 'Favicon indirildi ve gömüldü',
         'favicon_not_found' => 'Favicon bulunamadı',
+        'favicon_upload_rejected' => 'Dosya kaydedilmedi: en fazla :size boyutunda bir görsel olmalı',
         'enter_url_first' => 'Önce harici bir URL girin',
         'favicons_resolved' => ':count favicon çözümlendi',
+        'favicons_overridden' => ':count öğede gömülü simge bağlantıya göre önceliklidir — topbar onu göstermeye devam eder.',
         'import_success' => ':count menü öğesi içe aktarıldı',
         'import_invalid' => 'Dosya geçerli bir üst menü dışa aktarımı değil',
         'cache_flushed' => 'Menü önbelleği temizlendi',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'Favicon çözümleme devre dışı (filament-topbar-menu.enable_favicons); yapılacak bir şey yok.',
         'nothing_to_refresh' => 'Favicon yenilemesi gereken menü öğesi yok.',
         'not_found' => 'bulunamadı',
+        'embedded' => 'gömüldü (:type)',
         'resolved_summary' => ':total favicon\'dan :resolved tanesi çözümlendi.',
         'table_created' => '":table" menü tablosu ":connection" bağlantısında oluşturuldu.',
         'table_exists' => '":table" menü tablosu ":connection" bağlantısında zaten mevcut; yapılacak bir şey yok.',
+        'column_added' => '":column" sütunu ":table" menü tablosuna eklendi.',
         'copied' => 'Varsayılan bağlantıdan ":connection" bağlantısına :count menü öğesi kopyalandı.',
         'copy_skipped_existing' => 'Kopyalama atlandı: ":connection" üzerindeki menüde zaten öğeler var; bu uygulamanın yerel menüsü onunla birleştirilmedi.',
         'copy_skipped_no_dedicated' => 'Kopyalama atlandı: özel bir bağlantı yapılandırılmamış; menü zaten varsayılan bağlantıda.',

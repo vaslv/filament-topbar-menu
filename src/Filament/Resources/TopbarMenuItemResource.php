@@ -10,6 +10,8 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -31,7 +33,10 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\HtmlString;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Throwable;
 use UnitEnum;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages;
@@ -235,6 +240,139 @@ class TopbarMenuItemResource extends Resource
                                     }),
                             ),
 
+                        // The embedded icon: the image's own bytes, for links
+                        // whose icon a visitor's browser cannot fetch (a host
+                        // behind HTTP auth, an internal-only service). Stored in
+                        // the record, never on a disk — the deployments that
+                        // need this are the ones without persistent file
+                        // storage, and a `data:` URI travels with the menu
+                        // through export/import and the cached snapshot.
+                        //
+                        // Three components rather than one FileUpload, because
+                        // the stored value is a `data:` URI and FileUpload can
+                        // neither display one as its state nor round-trip it:
+                        // Hidden holds the value, the upload writes into it from
+                        // its own afterStateUpdated() below, and the preview
+                        // shows what is actually stored.
+                        //
+                        // The value is validated on the way in as well as on the
+                        // way out. A Hidden field's state is client-controlled —
+                        // a panel user can PATCH `data.favicon_data` to anything
+                        // — and while displayIcon() would refuse a bad value at
+                        // render time, without this the row still gets written,
+                        // uncapped, into the column that rides in the cached
+                        // menu snapshot.
+                        Hidden::make('favicon_data')
+                            ->dehydrateStateUsing(fn (mixed $state): ?string => is_string($state)
+                                && TopbarMenuItem::isStorableFaviconData($state)
+                                    ? $state
+                                    : null),
+
+                        // A TextEntry inside the form, not a Placeholder: that
+                        // one is a deprecated alias of this class in Filament 5.
+                        TextEntry::make('favicon_data_preview')
+                            ->label(static::trans('fields.favicon_data.label'))
+                            ->state(fn (Get $get): HtmlString => static::faviconDataPreview($get('favicon_data')))
+                            ->hintAction(
+                                Action::make('clearFaviconData')
+                                    ->label(static::trans('actions.clear_favicon_data'))
+                                    ->icon('heroicon-m-x-mark')
+                                    ->color('gray')
+                                    ->visible(fn (Get $get): bool => filled($get('favicon_data')))
+                                    ->action(fn (Set $set) => $set('favicon_data', null)),
+                            ),
+
+                        FileUpload::make('favicon_upload')
+                            ->label(static::trans('fields.favicon_data.upload'))
+                            ->helperText(static::trans('fields.favicon_data.helper'))
+                            ->image()
+                            ->acceptedFileTypes(TopbarMenuItem::FAVICON_DATA_TYPES)
+                            // Filament's own limit is in kilobytes; the byte cap
+                            // is the authority, and the model re-checks it on the
+                            // decoded bytes, so this only spares the admin an
+                            // upload that would be rejected on save anyway.
+                            ->maxSize((int) ceil(TopbarMenuItem::faviconMaxBytes() / 1024))
+                            // No disk write: the state stays a
+                            // TemporaryUploadedFile, which the closure below
+                            // reads and turns into the stored `data:` URI.
+                            ->storeFiles(false)
+                            ->dehydrated(false)
+                            ->live()
+                            ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                // FileUpload keeps its state as an array keyed
+                                // by upload id even when it accepts one file.
+                                $file = is_array($state) ? Arr::first($state) : $state;
+
+                                // Removing the file runs this same closure with
+                                // an empty state (BaseFileUpload::removeUploadedFile
+                                // calls it right after unsetting the file), so
+                                // this is also the "clear it" path. Returning
+                                // early here would leave the icon the admin just
+                                // removed still stored and still rendering.
+                                if (blank($file)) {
+                                    $set('favicon_data', null);
+
+                                    return;
+                                }
+
+                                if (! $file instanceof TemporaryUploadedFile) {
+                                    return;
+                                }
+
+                                $data = TopbarMenuItem::faviconDataFromBytes((string) $file->get());
+
+                                if ($data === null) {
+                                    Notification::make()
+                                        ->title(static::trans('notifications.favicon_upload_rejected', [
+                                            'size' => static::formatBytes(TopbarMenuItem::faviconMaxBytes()),
+                                        ]))
+                                        ->warning()
+                                        ->send();
+
+                                    return;
+                                }
+
+                                $set('favicon_data', $data);
+                            })
+                            ->hintAction(
+                                Action::make('embedFavicon')
+                                    ->label(static::trans('actions.embed_favicon'))
+                                    ->icon('heroicon-m-arrow-down-tray')
+                                    ->tooltip(static::trans('actions.embed_favicon_tooltip'))
+                                    ->visible(fn (): bool => (bool) config('filament-topbar-menu.enable_favicons', true))
+                                    ->action(function (Get $get, Set $set): void {
+                                        $url = $get('url');
+
+                                        if (blank($url)) {
+                                            Notification::make()
+                                                ->title(static::trans('notifications.enter_url_first'))
+                                                ->warning()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        $data = app(FaviconResolver::class)->resolveEmbedded($url);
+
+                                        if ($data === null) {
+                                            Notification::make()
+                                                ->title(static::trans('notifications.favicon_not_found'))
+                                                ->warning()
+                                                ->send();
+
+                                            return;
+                                        }
+
+                                        $set('favicon_data', $data);
+
+                                        Notification::make()
+                                            ->title(static::trans('notifications.favicon_embedded'))
+                                            ->success()
+                                            ->send();
+                                    }),
+                            )
+                            ->columnSpanFull(),
+
                         // A Select cannot bind to the `visibility` JSON column
                         // directly: Filament pipes a Select's raw state through
                         // OptionStateCast (strval) during hydration — before
@@ -337,6 +475,85 @@ class TopbarMenuItemResource extends Resource
         ));
     }
 
+    /**
+     * The embedded icon rendered at menu size, or a dash when the field holds
+     * nothing this package would render.
+     *
+     * The value is validated before it reaches the markup, not merely escaped:
+     * the same check displayIcon() applies, so the form preview cannot show an
+     * icon the topbar would refuse. Escaping stays on top of it because a
+     * preview is HTML this method builds by hand.
+     */
+    protected static function faviconDataPreview(mixed $value): HtmlString
+    {
+        if (! is_string($value) || ! TopbarMenuItem::isStorableFaviconData($value)) {
+            return new HtmlString('—');
+        }
+
+        return new HtmlString(
+            '<img src="'.e($value).'" alt="" class="h-8 w-8 rounded object-contain">',
+        );
+    }
+
+    /**
+     * Resolve favicon LINKS for the selected records and report how many were
+     * stored — and, separately, how many of them will not actually change what
+     * the topbar shows.
+     *
+     * That second count is the point: displayIcon() prefers an embedded icon
+     * over a link, so storing a link for an item that carries one succeeds and
+     * changes nothing visible. Reporting "5 resolved" while the menu stays put
+     * is the kind of silence an admin cannot debug, so the count says so.
+     *
+     * @param  Collection<int, TopbarMenuItem>  $records
+     */
+    protected static function resolveFaviconsFor(Collection $records): void
+    {
+        $resolver = app(FaviconResolver::class);
+        $resolved = 0;
+        $overridden = 0;
+
+        foreach ($records as $record) {
+            if ($record->type !== TopbarMenuItem::TYPE_URL || blank($record->url)) {
+                continue;
+            }
+
+            $favicon = $resolver->resolve($record->url);
+
+            if ($favicon === null) {
+                continue;
+            }
+
+            $record->forceFill(['favicon_url' => $favicon])->save();
+            $resolved++;
+
+            if (TopbarMenuItem::isStorableFaviconData($record->favicon_data)) {
+                $overridden++;
+            }
+        }
+
+        $notification = Notification::make()
+            ->title(static::trans('notifications.favicons_resolved', ['count' => $resolved]))
+            ->success();
+
+        if ($overridden > 0) {
+            $notification->body(static::trans('notifications.favicons_overridden', ['count' => $overridden]));
+        }
+
+        $notification->send();
+    }
+
+    /**
+     * A byte count as an admin-readable size, for the message that explains a
+     * rejected upload.
+     */
+    protected static function formatBytes(int $bytes): string
+    {
+        return $bytes >= 1024
+            ? round($bytes / 1024).' KB'
+            : $bytes.' B';
+    }
+
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -408,6 +625,17 @@ class TopbarMenuItemResource extends Resource
                         TextEntry::make('favicon_url')
                             ->label(static::trans('fields.favicon_url.label'))
                             ->placeholder('—'),
+
+                        // The stored bytes are never shown as text — a `data:`
+                        // URI is thousands of characters. What matters on this
+                        // page is that an embedded icon exists (it overrides the
+                        // URL above) and what it looks like.
+                        // No ->placeholder() here: the state is always an
+                        // HtmlString, never blank, so Filament would never reach
+                        // one. faviconDataPreview() returns the dash itself.
+                        TextEntry::make('favicon_data')
+                            ->label(static::trans('fields.favicon_data.label'))
+                            ->state(fn (TopbarMenuItem $record): HtmlString => static::faviconDataPreview($record->favicon_data)),
 
                         TextEntry::make('visibility_mode')
                             ->label(static::trans('fields.visibility.label'))
@@ -593,31 +821,21 @@ class TopbarMenuItemResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    // Only links are resolved in bulk. Embedding deliberately
+                    // has no bulk action: an embedded icon may be one an admin
+                    // uploaded by hand — for a host behind auth that is the ONLY
+                    // way to get one — and nothing can re-fetch it, so a single
+                    // click that overwrites a selection of them is a door that
+                    // only opens one way. It is also the expensive direction (a
+                    // page fetch plus up to eleven candidate requests per item,
+                    // synchronously, inside the web request). The artisan
+                    // command covers the bulk case and skips items that already
+                    // carry an icon unless --force says otherwise.
                     BulkAction::make('refreshFavicons')
                         ->label(static::trans('actions.fetch_favicons'))
                         ->icon('heroicon-m-arrow-path')
                         ->visible(fn (): bool => (bool) config('filament-topbar-menu.enable_favicons', true))
-                        ->action(function (Collection $records): void {
-                            $resolver = app(FaviconResolver::class);
-                            $resolved = 0;
-
-                            /** @var TopbarMenuItem $record */
-                            foreach ($records as $record) {
-                                if ($record->type !== TopbarMenuItem::TYPE_URL || blank($record->url)) {
-                                    continue;
-                                }
-
-                                if ($favicon = $resolver->resolve($record->url)) {
-                                    $record->forceFill(['favicon_url' => $favicon])->save();
-                                    $resolved++;
-                                }
-                            }
-
-                            Notification::make()
-                                ->title(static::trans('notifications.favicons_resolved', ['count' => $resolved]))
-                                ->success()
-                                ->send();
-                        })
+                        ->action(fn (Collection $records) => static::resolveFaviconsFor($records))
                         ->deselectRecordsAfterCompletion(),
 
                     DeleteBulkAction::make(),

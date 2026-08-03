@@ -54,6 +54,11 @@ return [
         'favicon_url' => [
             'label' => 'Favicon-URL',
         ],
+        'favicon_data' => [
+            'label' => 'Eingebettetes Favicon',
+            'upload' => 'Symbol hochladen',
+            'helper' => 'Wird im Menü selbst gespeichert, nicht auf einer Festplatte. Nützlich, wenn das Symbol nicht aus dem Browser jedes Besuchers erreichbar ist — eine Seite hinter einer Anmeldung oder ein rein interner Dienst. Ein eingebettetes Symbol hat Vorrang vor der Favicon-URL.',
+        ],
         'visibility' => [
             'label' => 'Sichtbar für',
             'placeholder' => 'Alle',
@@ -99,6 +104,9 @@ return [
         'fetch_favicon' => 'Favicon abrufen',
         'fetch_favicon_tooltip' => 'Favicon aus der obigen URL ermitteln',
         'fetch_favicons' => 'Favicons abrufen',
+        'embed_favicon' => 'Abrufen und einbetten',
+        'embed_favicon_tooltip' => 'Das Favicon von der obigen URL herunterladen und das Bild selbst speichern',
+        'clear_favicon_data' => 'Entfernen',
         'export' => 'Exportieren',
         'import' => 'Importieren',
         'create_table' => 'Menütabelle erstellen',
@@ -119,9 +127,12 @@ return [
 
     'notifications' => [
         'favicon_resolved' => 'Favicon ermittelt',
+        'favicon_embedded' => 'Favicon heruntergeladen und eingebettet',
         'favicon_not_found' => 'Kein Favicon gefunden',
+        'favicon_upload_rejected' => 'Die Datei wurde nicht gespeichert: erforderlich ist ein Bild von höchstens :size',
         'enter_url_first' => 'Bitte zuerst eine externe URL eingeben',
         'favicons_resolved' => ':count Favicon(s) ermittelt',
+        'favicons_overridden' => 'Bei :count Eintrag/Einträgen überschreibt ein eingebettetes Symbol den Link — die Topbar zeigt weiterhin dieses.',
         'import_success' => ':count Menüeintrag/-einträge importiert',
         'import_invalid' => 'Die Datei ist kein gültiger Menü-Export',
         'cache_flushed' => 'Menü-Cache geleert',
@@ -133,9 +144,11 @@ return [
         'disabled' => 'Die Favicon-Auflösung ist deaktiviert (filament-topbar-menu.enable_favicons); nichts zu tun.',
         'nothing_to_refresh' => 'Keine Menüeinträge benötigen eine Favicon-Aktualisierung.',
         'not_found' => 'nicht gefunden',
+        'embedded' => 'eingebettet (:type)',
         'resolved_summary' => ':resolved von :total Favicon(s) ermittelt.',
         'table_created' => 'Menütabelle ":table" wurde auf der Verbindung ":connection" erstellt.',
         'table_exists' => 'Menütabelle ":table" existiert bereits auf der Verbindung ":connection"; nichts zu tun.',
+        'column_added' => 'Spalte ":column" zur Menütabelle ":table" hinzugefügt.',
         'copied' => ':count Menüeintrag/-einträge von der Standardverbindung nach ":connection" kopiert.',
         'copy_skipped_existing' => 'Kopieren übersprungen: Das Menü auf ":connection" enthält bereits Einträge; das lokale Menü dieser App wird nicht hineingemischt.',
         'copy_skipped_no_dedicated' => 'Kopieren übersprungen: Keine dedizierte Verbindung konfiguriert; das Menü liegt bereits auf der Standardverbindung.',

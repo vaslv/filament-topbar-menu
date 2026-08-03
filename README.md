@@ -126,7 +126,7 @@ views.
 
 Menu items live in the `filament_topbar_menu_items` table and are managed through the included Filament resource:
 
-- **Label**, **icon** (any Filament-supported icon, e.g. `heroicon-o-link`) and **favicon URL** — an item shows one marker, and a favicon URL always wins over the icon name
+- **Label**, **icon** (any Filament-supported icon, e.g. `heroicon-o-link`), **favicon URL** and **embedded favicon** — an item shows one marker: an embedded favicon wins over a favicon URL, which wins over the icon name
 - **Link type** — external `URL` or internal `Laravel route` (with optional route parameters)
 - **Target** — open in the same tab or a new tab
 - **Parent item** — items with a parent are shown in the parent's dropdown. The
@@ -313,10 +313,11 @@ menu between installs (e.g. staging → production) or keeping it as a backup.
   deletes or half-imports anything.
 
 Because the file is untrusted input, import re-applies the same guards as the
-form: URLs and favicon URLs must be plain `http(s)` links (a `javascript:` or
-`data:` link is rejected, never rendered into the topbar), route parameters must
-be scalar, visibility rules must be well-shaped, and the tree may be at most two
-levels deep. Export is gated behind the resource's *viewAny* permission and import
+form: the `url` and `favicon_url` fields must be plain `http(s)` links (a
+`javascript:` or `data:` link is rejected there, never rendered into the topbar),
+an embedded `favicon_data` must be a base64 `data:` URI of a whitelisted image
+type within `favicon_max_bytes`, route parameters must be scalar, visibility
+rules must be well-shaped, and the tree may be at most two levels deep. Export is gated behind the resource's *viewAny* permission and import
 behind *create*; the replace option only appears for users the *deleteAny* policy
 allows.
 
@@ -332,24 +333,36 @@ with a host and rejects the whole file if one is missing.
 
 ## Favicons
 
-For external links the plugin can resolve the site's favicon and store it in the `favicon_url` column, so **no remote HTTP request ever happens while the menu renders**.
+For external links the plugin can resolve the site's favicon and store it — as a link in the `favicon_url` column, or as the image itself in `favicon_data` — so **no remote HTTP request ever happens while the menu renders**.
 
 Resolution strategy (`FaviconResolver`), most specific first:
 
 1. Parse the `<link rel="icon">` tags of the page the item links to, so a
    sub-page that declares its own icon (a Horizon or Telescope dashboard, a docs
-   section) keeps it instead of the site-wide one.
-2. Try `favicon.ico` in the directory the link points at — `/admin/favicon.ico`
-   for an item linking to `/admin`, `/docs/favicon.ico` for one linking to
-   `/docs/page.html`.
-3. Fall back to the conventional `https://host/favicon.ico`.
+   section) keeps it instead of the site-wide one. Quoted and unquoted
+   attributes are both read, so a minified page is not skipped. Candidates are
+   ranked by `rel` before document order — `icon` / `shortcut icon` first, then
+   `apple-touch-icon`, then the rest — because a page commonly declares its
+   180×180 home-screen tile first, and that is not the icon a topbar renders at
+   ~16px.
+2. Try `favicon.ico`, `favicon.svg` and `favicon.png` in the directory the link
+   points at — `/admin/favicon.ico` for an item linking to `/admin`,
+   `/docs/favicon.svg` for one linking to `/docs/page.html`.
+3. Fall back to the same three names at the host root, `https://host/favicon.ico`
+   first.
 
 Step 2 is the one a browser does not do, and it exists for single-page apps: a
 Directus or Nova panel mounted on a sub-path inserts its `<link rel="icon">` from
 JavaScript, so the HTML this resolver reads declares nothing, while the host root
 of such a deployment is often an API that answers `404`. The icon still sits in
 the app's own directory. When the link already points at the host root, steps 2
-and 3 are the same URL and only one request is made.
+and 3 are the same URLs and each name is requested once.
+
+The non-`.ico` names matter for the same reason: a site that ships only
+`favicon.svg` declares it in markup, and a page this resolver cannot read leaves
+guessing as the only route to it. `apple-touch-icon.png` is deliberately not
+guessed at — a site that has one virtually always declares it, where step 1
+already finds it.
 
 At most five declared icons are probed per page, so a page cannot dictate an
 unbounded number of outbound requests. Relative hrefs are resolved against the
@@ -359,11 +372,14 @@ the site-wide icon) and otherwise against the URL that actually answered, after
 redirects.
 
 Resolution runs **anonymously**, with no session or cookies. A page behind auth
-answers `401`/`403`, so its own icon is unreachable; the root `favicon.ico` is
-stored instead when that one answers `2xx` with a non-empty body whose
+answers `401`/`403`, so its own icon is unreachable; a conventional location is
+stored instead when one of them answers `2xx` with a non-empty body whose
 `Content-Type` is absent or mentions `image`, `icon` or `octet-stream` (an HTML
 error page is rejected), and otherwise nothing is stored at all — paste the icon
-URL into the Favicon URL field by hand for those items.
+URL into the Favicon URL field by hand for those items. When the *whole host*
+sits behind auth (an HTTP Basic realm in front of everything, say), even the icon
+file itself answers `401` and no amount of searching can reach it: save the icon
+from your own browser and upload it to the item instead — see below.
 
 The resolver also treats every linked site as untrusted and **refuses to fetch
 private, loopback, link-local and reserved addresses** (including cloud metadata
@@ -374,11 +390,67 @@ pointing at an internal-only host therefore never gets an auto-resolved
 favicon: fill the field by hand, or serve the icon from a publicly reachable
 URL.
 
-Ways to resolve favicons:
+### Link or image: two ways to store a favicon
+
+A favicon URL is a **link**. Nothing fetches it at render time — but the
+*visitor's browser* does, once per item, on every panel page. That is fine for a
+public site and useless for anything else: a service behind a login answers
+`401` to a visitor who is not signed into it, an internal-only host does not
+answer them at all, and either way the menu shows a broken image. It also means
+every panel user quietly requests every host in your menu.
+
+The alternative is to store the **image itself** — bytes and all — in the
+`favicon_data` column, as a `data:` URI:
+
+- Nothing is fetched at render time by anyone, so an icon that only the *server*
+  can reach (or that only *you* can reach, if you upload it) still shows for
+  every user.
+- No file storage is involved. The icon lives in the menu row, which means it
+  survives a redeploy on a container with no persistent disk, travels through
+  export/import, and is carried by the cached snapshot like every other field.
+- An embedded favicon **overrides** `favicon_url` when both are set.
+
+The cost is size: the icon is base64, so it inflates by a third, and the cached
+menu snapshot carries it. `favicon_max_bytes` (default 64 KB) caps the decoded
+image; raise or lower it in the config. Panels with a strict CSP need
+`img-src data:`.
+
+Only whitelisted image types are ever stored or rendered — PNG, JPEG, GIF, WebP,
+AVIF, BMP, ICO and SVG — and the type is taken from the **bytes**, not from the
+`Content-Type` a remote host claims or a file name an upload carries. (SVG is on
+that list because an SVG referenced by `<img>` is a passive image: scripts in it
+do not run and it cannot reach the page embedding it.) The check runs when the
+value is written *and* again when it is rendered, so a row written by a sibling
+app on a shared menu database, a seeder or hand-written SQL cannot put something
+unrenderable into the topbar.
+
+### Ways to resolve favicons
+
+Storing a **link**:
 
 - The **"Fetch favicon" suffix button** on the Favicon URL field in the create/edit form.
 - The **"Fetch favicons" bulk action** in the items table, for the rows you select.
-- The artisan command:
+
+Storing the **image**:
+
+- The **"Upload an icon" field** in the create/edit form — for a site the server
+  cannot reach either, which is the only route to a favicon behind HTTP Basic
+  auth.
+- The **"Fetch and embed" button** on that field: same search as above, but it
+  downloads what it finds and stores the bytes.
+
+There is deliberately **no bulk action for embedding**. An embedded icon may be
+one an admin uploaded by hand, nothing can re-fetch it, and a single click that
+overwrites a selection of them is a door that only opens one way. It is also the
+expensive direction — a page fetch plus up to eleven candidate requests per item,
+synchronously, inside the web request. Use the command below for the bulk case:
+it skips items that already carry one unless `--force` says otherwise.
+
+The bulk **"Fetch favicons"** action stores links only. When an item it resolves
+also carries an embedded icon, the notification says so — the link is stored, but
+the embedded copy is what the topbar keeps showing.
+
+The artisan command does either:
 
 ```bash
 # Fill favicons for items that don't have one yet:
@@ -391,9 +463,15 @@ php artisan filament-topbar-menu:refresh-favicons --force
 # Only specific items (still skips the ones that already have a favicon,
 # so combine with --force to re-resolve them):
 php artisan filament-topbar-menu:refresh-favicons --id=1 --id=2
+
+# Store the images themselves instead of links:
+php artisan filament-topbar-menu:refresh-favicons --embed
 ```
 
-Disable the whole feature with `'enable_favicons' => false` in the config — the actions and the command become no-ops.
+`--embed` fills `favicon_data` and reads the same column to decide which items
+still need one, so the two modes never overwrite each other's work.
+
+Disable the whole feature with `'enable_favicons' => false` in the config — the actions and the command become no-ops. The upload field keeps working: it stores a file you chose, it does not fetch anything.
 
 ## Configuration
 
@@ -413,6 +491,8 @@ return [
     'cache_ttl' => 3600,
     'enable_favicons' => true,
     'favicon_request_timeout' => 5,
+    // Cap on an EMBEDDED favicon, applied to the decoded image (see "Favicons").
+    'favicon_max_bytes' => 65536,
     // The resource's read-only View page: a `{record}` route, a View row
     // action, and create/edit saves landing on that page (see "View page"
     // above). Set FILAMENT_TOPBAR_MENU_VIEW_PAGE=false for a plain
@@ -571,10 +651,11 @@ not a security boundary, and grants no access either way.
   `down()` is a no-op: a routine `migrate:rollback` in one app must not drop
   the menu of the whole fleet. Dropping a shared menu table is a deliberate
   manual step.
-- **Keep package versions in sync.** The create-only migration never alters an
-  existing table, so future schema changes ship as separate migrations. Apps
-  pinned to different package versions writing to one shared table are
-  unsupported — upgrade them together.
+- **Keep package versions in sync.** The create migration never alters an
+  existing table, so schema changes ship as separate migrations — `favicon_data`
+  is the first of them. Each is idempotent and race-safe, so several apps
+  running it against one shared database is fine; apps pinned to *different*
+  package versions writing to one shared table are not — upgrade them together.
 - **Restrict who edits.** Every app with the resource enabled can edit the
   shared menu. In apps that should only *render* it, disable the management UI
   with `TopbarMenuPlugin::make()->resource(false)`; read-only database

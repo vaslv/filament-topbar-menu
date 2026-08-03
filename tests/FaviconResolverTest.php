@@ -537,4 +537,331 @@ class FaviconResolverTest extends TestCase
 
         $this->assertSame(1, $probes);
     }
+
+    public function test_the_conventional_probe_covers_svg_and_png_not_just_ico(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/favicon.svg' => Http::response('<svg/>', 200, ['Content-Type' => 'image/svg+xml']),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        // A site that ships only `favicon.svg` and declares it from markup this
+        // resolver cannot read (here: the whole host is behind auth) still has a
+        // findable icon — guessing at `.ico` alone would store nothing.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/');
+
+        $this->assertSame('https://example.com/favicon.svg', $favicon);
+    }
+
+    public function test_the_conventional_probe_prefers_the_link_directory_over_the_root_in_any_format(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/admin/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/admin/favicon.svg' => Http::response('<svg/>', 200, ['Content-Type' => 'image/svg+xml']),
+            'https://example.com/admin' => Http::response(
+                '<html><head><title>No icon here</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // Every name is tried in the link's own directory before the host root,
+        // so a sub-path app keeps its icon whatever format either side ships.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
+
+        $this->assertSame('https://example.com/admin/favicon.svg', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.ico');
+    }
+
+    public function test_the_conventional_probe_prefers_ico_over_the_other_formats(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('icon-bytes', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/favicon.svg' => Http::response('<svg/>', 200, ['Content-Type' => 'image/svg+xml']),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.svg');
+    }
+
+    public function test_it_reads_an_icon_declared_with_unquoted_attributes(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.svg' => Http::response('<svg/>', 200, ['Content-Type' => 'image/svg+xml']),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel=icon type=image/svg+xml href=/favicon.svg></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // Unquoted attributes are valid HTML and what a minifier emits; the page
+        // does declare its icon, so it must be read rather than guessed at.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/');
+
+        $this->assertSame('https://example.com/favicon.svg', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/favicon.ico');
+    }
+
+    public function test_it_reads_a_base_href_declared_without_quotes(): void
+    {
+        Http::fake([
+            'https://example.com/admin/favicon.png' => Http::response('app-icon', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/admin' => Http::response(
+                '<html><head><base href=/admin/><link rel=icon href=favicon.png></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
+
+        $this->assertSame('https://example.com/admin/favicon.png', $favicon);
+    }
+
+    public function test_a_prefixed_attribute_is_not_read_as_the_one_asked_for(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response('root-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/decoy.png' => Http::response('decoy', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel="icon" data-href="/decoy.png" href="/favicon.ico"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // `data-href` is not `href`: the attribute name is matched on its own
+        // boundary, so a prefixed one never stands in for the real value.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/');
+
+        $this->assertSame('https://example.com/favicon.ico', $favicon);
+        Http::assertNotSent(fn ($request): bool => $request->url() === 'https://example.com/decoy.png');
+    }
+
+    public function test_it_embeds_the_icon_bytes_when_asked_to(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.png' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel="icon" href="/favicon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolveEmbedded('https://example.com/');
+
+        // The image itself, so nothing has to be reachable from a visitor's
+        // browser at render time.
+        $this->assertSame('data:image/png;base64,'.base64_encode(self::PNG), $favicon);
+    }
+
+    public function test_embedding_does_not_download_the_icon_a_second_time(): void
+    {
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        app(FaviconResolver::class)->resolveEmbedded('https://example.com/');
+
+        // The search already read the bytes to decide the candidate was an
+        // image; embedding must reuse them rather than fetch the icon again.
+        $probes = 0;
+
+        foreach (Http::recorded() as [$request]) {
+            if ($request->url() === 'https://example.com/favicon.ico') {
+                $probes++;
+            }
+        }
+
+        $this->assertSame(1, $probes);
+    }
+
+    public function test_embedding_refuses_bytes_that_are_not_a_whitelisted_image(): void
+    {
+        Http::fake([
+            // A server that mislabels its own 404 page as an icon: the type
+            // header says image, the bytes are HTML.
+            'https://example.com/favicon.ico' => Http::response('<html>Not an icon</html>', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/favicon.svg' => Http::response('Not Found', 404),
+            'https://example.com/favicon.png' => Http::response('Not Found', 404),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        $favicon = app(FaviconResolver::class)->resolveEmbedded('https://example.com/');
+
+        // The type is sniffed from the bytes, not taken from the header, so
+        // nothing unrenderable is stored.
+        $this->assertNull($favicon);
+    }
+
+    public function test_embedding_refuses_an_icon_over_the_byte_cap(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        $this->assertNull(app(FaviconResolver::class)->resolveEmbedded('https://example.com/'));
+    }
+
+    public function test_the_byte_cap_does_not_stop_the_link_from_being_stored(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG) - 1);
+
+        Http::fake([
+            'https://example.com/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response('Unauthorized', 401),
+        ]);
+
+        // The cap governs what goes into the record and the cached snapshot,
+        // not whether the icon is the right one — an icon too big to embed is
+        // still perfectly good to link to.
+        $this->assertSame('https://example.com/favicon.ico', app(FaviconResolver::class)->resolve('https://example.com/'));
+    }
+
+    public function test_embedding_obeys_the_feature_switch(): void
+    {
+        config()->set('filament-topbar-menu.enable_favicons', false);
+
+        Http::fake();
+
+        $this->assertNull(app(FaviconResolver::class)->resolveEmbedded('https://example.com/'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_declared_tab_icon_wins_over_an_apple_touch_icon_declared_first(): void
+    {
+        Http::fake([
+            'https://example.com/apple-touch-icon.png' => Http::response('big-tile', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/favicon.ico' => Http::response('real-icon', 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response(
+                '<html><head>'
+                .'<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
+                .'<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">'
+                .'<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">'
+                .'</head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // Pages routinely declare the home-screen tile first. It is 180×180 and
+        // several times the bytes, while the topbar renders the marker at ~16px
+        // — so document order must not decide this.
+        $this->assertSame('https://example.com/favicon.ico', app(FaviconResolver::class)->resolve('https://example.com/'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'apple-touch-icon'));
+    }
+
+    public function test_an_apple_touch_icon_is_still_used_when_it_is_all_there_is(): void
+    {
+        Http::fake([
+            'https://example.com/apple-touch-icon.png' => Http::response('tile', 200, ['Content-Type' => 'image/png']),
+            'https://example.com/favicon.ico' => Http::response('Not Found', 404),
+            'https://example.com/favicon.svg' => Http::response('Not Found', 404),
+            'https://example.com/favicon.png' => Http::response('Not Found', 404),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel="apple-touch-icon" href="/apple-touch-icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // Ranking is a preference, not a filter — a lower-ranked icon is still
+        // better than no icon.
+        $this->assertSame(
+            'https://example.com/apple-touch-icon.png',
+            app(FaviconResolver::class)->resolve('https://example.com/'),
+        );
+    }
+
+    public function test_embedding_moves_on_when_a_candidate_is_too_big_to_store(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG));
+
+        $oversized = self::PNG.str_repeat("\x00", 64);
+
+        Http::fake([
+            'https://example.com/big.png' => Http::response($oversized, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/small.png' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/' => Http::response(
+                '<html><head>'
+                .'<link rel="icon" href="/big.png">'
+                .'<link rel="icon" href="/small.png">'
+                .'</head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // "Too big to store" is not the same answer as "this site has no icon":
+        // the next declared candidate must still be tried.
+        $this->assertSame(
+            'data:image/png;base64,'.base64_encode(self::PNG),
+            app(FaviconResolver::class)->resolveEmbedded('https://example.com/'),
+        );
+    }
+
+    public function test_embedding_falls_through_to_a_conventional_location(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', strlen(self::PNG));
+
+        Http::fake([
+            'https://example.com/declared.png' => Http::response(self::PNG.str_repeat("\x00", 64), 200, ['Content-Type' => 'image/png']),
+            'https://example.com/favicon.ico' => Http::response(self::PNG, 200, ['Content-Type' => 'image/x-icon']),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel="icon" href="/declared.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // The only declared icon is unstorable, so the search continues into
+        // the conventional locations rather than giving up on the page.
+        $this->assertSame(
+            'data:image/png;base64,'.base64_encode(self::PNG),
+            app(FaviconResolver::class)->resolveEmbedded('https://example.com/'),
+        );
+    }
+
+    public function test_storing_a_link_is_unaffected_by_what_can_be_embedded(): void
+    {
+        config()->set('filament-topbar-menu.favicon_max_bytes', 8);
+
+        Http::fake([
+            'https://example.com/icon.png' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/' => Http::response(
+                '<html><head><link rel="icon" href="/icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        // The cap governs what is copied into the record, not which icon the
+        // site has — resolve() must not inherit the embed test.
+        $this->assertSame('https://example.com/icon.png', app(FaviconResolver::class)->resolve('https://example.com/'));
+    }
+
+    public function test_embedding_keeps_the_ssrf_guard(): void
+    {
+        Http::fake();
+
+        $this->assertNull(app(FaviconResolver::class)->resolveEmbedded('http://127.0.0.1/'));
+
+        // Embedding is the same search as resolve(), so a private address is
+        // refused before any request is made — the guard is not bypassed by
+        // asking for the bytes instead of the link.
+        Http::assertNothingSent();
+    }
 }
