@@ -4,8 +4,8 @@ namespace Vaslv\FilamentTopbarMenu;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
 class TopbarMenu
@@ -36,21 +36,35 @@ class TopbarMenu
 
                 Cache::put($this->cacheKey(), $cached, config('filament-topbar-menu.cache_ttl', 3600));
             }
-        } catch (QueryException $e) {
+
+            return $this->hydrate($cached);
+        } catch (Throwable $e) {
             // The menu is chrome rendered on every panel page — it must never
-            // take the whole app down. The typical trigger: an install switched
-            // to a dedicated connection whose table does not exist yet (the
-            // create-table deploy step has not run). Degrade to an empty menu
-            // and report the error instead of failing every request. Nothing is
-            // cached on this path — Cache::remember stores only a successful
-            // snapshot — so the menu reappears on the first request after the
-            // table exists.
+            // take the whole app down. Degrade to an empty menu and report the
+            // error instead of failing every request. Nothing is cached on this
+            // path — Cache::remember stores only a successful snapshot — so the
+            // menu reappears on the first request after the fault is cleared.
+            //
+            // Throwable, not QueryException: the ways this call fails are not
+            // limited to a query, and every one of them lands on the same
+            // render hook.
+            //
+            //   - the menu table does not exist yet (the typical trigger: an
+            //     install switched to a dedicated connection and the
+            //     create-table deploy step has not run) — a QueryException;
+            //   - `connection` names a connection config/database.php does not
+            //     define, which is the same switch half-deployed one step
+            //     earlier — an InvalidArgumentException from DatabaseManager;
+            //   - the cache store itself is down (Redis refusing connections),
+            //     which reaches this method through Cache::remember.
+            //
+            // hydrate() is inside the try for the same reason: it resolves the
+            // model's connection to build the query grammar, so it throws on a
+            // misconfigured connection even when the snapshot came from cache.
             report($e);
 
             return new Collection;
         }
-
-        return $this->hydrate($cached);
     }
 
     /**
@@ -66,9 +80,23 @@ class TopbarMenu
             ->values();
     }
 
+    /**
+     * Drop the cached snapshot.
+     *
+     * Best-effort by design: this runs from the model's saved/deleted hooks, so
+     * a store that is down would otherwise turn every menu write — and every
+     * import — into a 500. There is nothing to invalidate on a store that
+     * cannot answer, and items() degrades to an empty menu on the read side for
+     * the same fault, so swallowing the failure here loses nothing that was
+     * still working.
+     */
     public function flushCache(): void
     {
-        Cache::forget($this->cacheKey());
+        try {
+            Cache::forget($this->cacheKey());
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     public function cacheKey(): string
