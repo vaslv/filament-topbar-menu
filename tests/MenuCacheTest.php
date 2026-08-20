@@ -186,7 +186,7 @@ class MenuCacheTest extends TestCase
         // one global key the snapshot above answered for this one too, until it
         // expired — the wrong menu, from the wrong database, with no write to
         // flush it.
-        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 0');
+        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 1 = 0');
         config(['filament-topbar-menu.table_name' => 'other_menu_items']);
 
         TopbarMenuItem::create(['label' => 'On the other table', 'type' => 'url', 'url' => '/b']);
@@ -197,7 +197,7 @@ class MenuCacheTest extends TestCase
     public function test_flushing_targets_the_key_the_menu_is_actually_cached_under(): void
     {
         config(['filament-topbar-menu.table_name' => 'other_menu_items']);
-        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 0');
+        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 1 = 0');
 
         TopbarMenuItem::create(['label' => 'Item', 'type' => 'url', 'url' => '/a']);
         TopbarMenu::items();

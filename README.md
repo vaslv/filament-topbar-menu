@@ -20,6 +20,10 @@ A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to 
 
 - PHP 8.2+
 - Filament ^5.0
+- `ext-intl` is optional but recommended. Without it, two things degrade
+  quietly: `hide_on_current_domain` (see [Visibility rules](#visibility-rules))
+  stops matching an internationalized domain, and favicons of internationalized
+  domains cannot be resolved at all. Everything else works unchanged.
 
 ## Installation
 

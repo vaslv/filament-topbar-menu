@@ -22,19 +22,23 @@ docker run --rm -v "$PWD":/app -w /app php84-intl:latest composer check
 
 There is no dead-code or shell-lint tool configured.
 
-CI runs the suite on 8.2, 8.3 and 8.4, and `composer.lock` is not committed, so
-each version resolves its own dependencies — 8.2 gets PHPUnit 11 and Testbench
-10 while 8.4 gets 12 and 11. A green run on one version is therefore not proof
-of the others: PHP's own behavior differs too (`filter_var()` classifies
-`::ffff:127.0.0.1` as public on 8.2 and reserved from 8.3, which is how an SSRF
-hole once reached a release). Before tagging, run the suite on the oldest
-supported version as well, in a clean copy so dependencies resolve for it:
+`composer.lock` is not committed, so every leg resolves its own dependencies.
+That matters: PHP's own behavior differs between versions (`filter_var()`
+classifies `::ffff:127.0.0.1` as public on 8.2 and reserved from 8.3, which is
+how an SSRF hole once reached a release), and so does the dependency set.
 
-```
-git archive HEAD | tar -x -C /tmp/pkg82 && cp phpunit.xml /tmp/pkg82/
-docker run --rm -v /tmp/pkg82:/app -w /app <php82-image> composer install
-docker run --rm -v /tmp/pkg82:/app -w /app <php82-image> vendor/bin/phpunit
-```
+CI covers the axes that have bitten this package:
+
+- PHP 8.2, 8.3 and 8.4, each resolving the newest dependencies it can.
+- PHP 8.2 with `--prefer-lowest`, so the bottom of every constraint runs too.
+- MySQL 8 and PostgreSQL 16. The package ships hand-written SQL
+  (`scopeTreeOrdered()`) and migrations written around driver behaviour;
+  SQLite tolerates shapes MySQL rejects. Point the suite at a server locally
+  with `TOPBAR_TEST_DB=pgsql` plus the usual `DB_*` variables.
+- One leg without `ext-intl`, which the package supports and guards for.
+
+A local run covers the first line of that list only, so read CI before tagging
+rather than treating a green local run as the answer.
 
 ## Releasing
 

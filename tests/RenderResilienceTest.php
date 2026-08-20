@@ -27,6 +27,8 @@ class RenderResilienceTest extends TestCase
 
     public function test_the_menu_recovers_on_the_first_request_after_the_table_appears(): void
     {
+        $this->requiresTheDefaultSqliteConnection();
+
         Schema::drop('filament_topbar_menu_items');
 
         // The failed render must not cache an empty snapshot — otherwise the

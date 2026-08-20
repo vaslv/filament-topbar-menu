@@ -52,6 +52,8 @@ class CreateTableCommandTest extends TestCase
 
     public function test_copies_the_menu_from_the_default_connection_when_switching(): void
     {
+        $this->requiresTheDefaultSqliteConnection();
+
         $root = TopbarMenuItem::create(['label' => 'Root', 'url' => 'https://example.com', 'sort' => 1]);
         TopbarMenuItem::create(['label' => 'Child', 'url' => 'https://example.com/child', 'parent_id' => $root->id]);
 

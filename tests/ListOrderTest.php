@@ -11,6 +11,7 @@ use Filament\Schemas\SchemasServiceProvider;
 use Filament\Tables\Table;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use ReflectionProperty;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
@@ -160,5 +161,51 @@ class ListOrderTest extends TestCase
             ->invoke($page, TopbarMenuItem::query());
 
         return $query->pluck('label')->all();
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function grammarProvider(): array
+    {
+        return ['mysql' => ['mysql'], 'pgsql' => ['pgsql'], 'sqlite' => ['sqlite']];
+    }
+
+    #[DataProvider('grammarProvider')]
+    public function test_the_tree_order_compiles_on_every_supported_grammar(string $driver): void
+    {
+        // The order is hand-written SQL through the connection's grammar, and
+        // CI runs the suite on SQLite alone — so nothing else here would notice
+        // a grammar that cannot produce it. Compiling needs no server.
+        $sql = TopbarMenuItem::on($driver)->treeOrdered()->toSql();
+
+        $this->assertStringContainsString('topbar_menu_parent', $sql);
+        $this->assertStringContainsString('topbar_menu_grandparent', $sql);
+
+        // Every reference to the row's own columns is qualified with the table.
+        // That is what lets this coexist with the join Filament adds when the
+        // table is sorted by `parent.label`: an unqualified `sort` or `id` would
+        // be ambiguous the moment a second copy of the table is in scope, and
+        // the failure would be a 500 on the admin list page for that install
+        // only. MySQL rejects it; SQLite does not, which is exactly why this
+        // cannot be left to the SQLite suite.
+        $this->assertStringNotContainsString('order by `sort`', $sql);
+        $this->assertStringNotContainsString('order by "sort"', $sql);
+        $this->assertMatchesRegularExpression('/order by .*filament_topbar_menu_items.*sort/', $sql);
+    }
+
+    public function test_the_tree_order_survives_the_join_filament_adds_for_the_parent_column(): void
+    {
+        // Sorting the items table by `parent.label` makes Filament join the
+        // table to itself. treeOrdered() uses correlated subqueries rather than
+        // joins of its own precisely so that this does not become ambiguous.
+        $sql = TopbarMenuItem::query()
+            ->join('filament_topbar_menu_items as parent', 'parent.id', '=', 'filament_topbar_menu_items.parent_id')
+            ->treeOrdered()
+            ->toSql();
+
+        // Quoting differs per grammar, so match the alias names themselves.
+        $this->assertMatchesRegularExpression('/as .?parent.?/', $sql);
+        $this->assertStringContainsString('topbar_menu_parent', $sql);
     }
 }

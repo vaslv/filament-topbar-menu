@@ -28,9 +28,38 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
-        $app['config']->set('database.default', 'testing');
+        // The driver under test. Testbench's in-memory SQLite by default, which
+        // is what a local run uses; CI's database matrix points this at a real
+        // MySQL and PostgreSQL, where the hand-written ORDER BY of
+        // scopeTreeOrdered() and the migrations' driver-specific behaviour
+        // (`after()`, the aborted-transaction recovery, `mediumText`) actually
+        // execute. SQLite tolerates shapes MySQL rejects, so a green run here
+        // is not a green run there.
+        $app['config']->set('database.default', env('TOPBAR_TEST_DB', 'testing'));
         $app['config']->set('cache.default', 'array');
         $app['config']->set('app.url', 'https://myapp.test');
+    }
+
+    /**
+     * Skip a test that is built on the in-memory SQLite the suite runs on by
+     * default, when the database matrix has pointed the default somewhere else.
+     *
+     * These are the tests whose FIXTURE is SQLite rather than whose SUBJECT is:
+     * a second `:memory:` connection standing in for a shared menu database,
+     * which RefreshDatabase only keeps alive while it is the app default, and a
+     * dropped table queried inside the wrapping transaction, which PostgreSQL
+     * answers by aborting the transaction rather than by failing one statement.
+     *
+     * They still run on every SQLite leg of the matrix, which is where their
+     * subject — routing between connections — actually lives. The matrix exists
+     * for the SQL a real server has to accept: the hand-written ORDER BY, the
+     * migrations, the column types.
+     */
+    protected function requiresTheDefaultSqliteConnection(): void
+    {
+        if (config('database.default') !== 'testing') {
+            $this->markTestSkipped('Built on the in-memory SQLite connection; the database matrix covers dialects, not connection routing.');
+        }
     }
 
     /**

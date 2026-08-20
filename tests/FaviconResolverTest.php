@@ -281,6 +281,10 @@ class FaviconResolverTest extends TestCase
 
     public function test_a_unicode_host_name_is_still_reachable(): void
     {
+        if (! function_exists('idn_to_ascii')) {
+            $this->markTestSkipped('ext-intl is not installed.');
+        }
+
         Http::fake([
             '*' => Http::response('Not Found', 404),
         ]);
@@ -291,6 +295,25 @@ class FaviconResolverTest extends TestCase
         $this->assertNull(app(FaviconResolver::class)->resolve('https://пример.рф/docs'));
 
         Http::assertSent(fn ($request): bool => str_contains($request->url(), 'docs'));
+    }
+
+    public function test_without_ext_intl_a_unicode_host_is_refused_rather_than_misjudged(): void
+    {
+        if (function_exists('idn_to_ascii')) {
+            $this->markTestSkipped('ext-intl is installed, so the degraded branch cannot run.');
+        }
+
+        Http::fake(['*' => Http::response('Not Found', 404)]);
+
+        // Without intl the host keeps its Cyrillic last label, `рф` does not
+        // start with an ASCII letter, and looksLikeHostName() therefore reads it
+        // as a numeric literal and refuses it. That is the safe direction — the
+        // guard exists to stop `0x7f.0.0.1` — but it does mean IDN favicons
+        // cannot be resolved at all on an install without the extension, which
+        // is why composer suggests it and the README says so.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://пример.рф/docs'));
+
+        Http::assertNothingSent();
     }
 
     public function test_a_page_cannot_dictate_an_unbounded_number_of_icon_probes(): void

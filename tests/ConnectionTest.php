@@ -17,6 +17,13 @@ use Vaslv\FilamentTopbarMenu\Support\MenuTransfer;
  */
 class ConnectionTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->requiresTheDefaultSqliteConnection();
+    }
+
     protected function defineEnvironment($app): void
     {
         parent::defineEnvironment($app);
