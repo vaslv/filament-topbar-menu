@@ -182,6 +182,74 @@ class TopbarMenuItemTest extends TestCase
         $this->assertFalse($other->isActive());
     }
 
+    public function test_is_active_matches_a_relative_link(): void
+    {
+        // The shape the package's own seeder writes (`/telescope`, `/horizon`).
+        // Compared whole against `request()->url()` it could never match, so the
+        // demo menu highlighted nothing at all.
+        $this->bindRequest('https://myapp.test/telescope');
+
+        $relative = new TopbarMenuItem(['type' => 'url', 'url' => '/telescope']);
+        $other = new TopbarMenuItem(['type' => 'url', 'url' => '/horizon']);
+
+        $this->assertTrue($relative->isActive());
+        $this->assertFalse($other->isActive());
+
+        // The same item the visibility rule already called current-host: the
+        // two answers used to contradict each other.
+        $this->assertTrue($relative->pointsAtCurrentHost());
+    }
+
+    public function test_is_active_ignores_differences_that_are_not_differences(): void
+    {
+        $this->bindRequest('https://myapp.test/dashboard');
+
+        foreach ([
+            'a fragment' => 'https://myapp.test/dashboard#top',
+            'a host in another case' => 'https://MyApp.test/dashboard',
+            'an explicit default port' => 'https://myapp.test:443/dashboard',
+            'the other scheme' => 'http://myapp.test/dashboard',
+            'a www. prefix' => 'https://www.myapp.test/dashboard',
+            'a query and a fragment' => 'https://myapp.test/dashboard?tab=1#top',
+        ] as $case => $url) {
+            $this->assertTrue(
+                (new TopbarMenuItem(['type' => 'url', 'url' => $url]))->isActive(),
+                "An item differing only by {$case} is the current page.",
+            );
+        }
+    }
+
+    public function test_is_active_still_refuses_another_page_or_another_host(): void
+    {
+        $this->bindRequest('https://myapp.test/dashboard');
+
+        foreach ([
+            'another host' => 'https://elsewhere.test/dashboard',
+            'another path on this host' => 'https://myapp.test/reports',
+            'a path that merely starts the same' => 'https://myapp.test/dashboard-archive',
+            'a relative link to another page' => '/reports',
+            'a mailto link' => 'mailto:team@myapp.test',
+            'a tel link' => 'tel:+123456789',
+        ] as $case => $url) {
+            $this->assertFalse(
+                (new TopbarMenuItem(['type' => 'url', 'url' => $url]))->isActive(),
+                "An item pointing at {$case} is not the current page.",
+            );
+        }
+    }
+
+    public function test_is_active_matches_the_root_however_it_is_spelled(): void
+    {
+        $this->bindRequest('https://myapp.test');
+
+        foreach (['https://myapp.test', 'https://myapp.test/', '/'] as $url) {
+            $this->assertTrue(
+                (new TopbarMenuItem(['type' => 'url', 'url' => $url]))->isActive(),
+                "[{$url}] is the root page.",
+            );
+        }
+    }
+
     public function test_a_group_is_active_when_one_of_its_children_is_active(): void
     {
         $this->bindRequest('https://myapp.test/reports');

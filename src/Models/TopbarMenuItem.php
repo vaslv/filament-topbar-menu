@@ -414,9 +414,45 @@ class TopbarMenuItem extends Model
             return false;
         }
 
-        $itemPath = rtrim((string) strtok($url, '?'), '/');
+        // The host half of the question is pointsAtCurrentHost()'s, so the two
+        // cannot disagree about the same item — they used to. It answers true
+        // for a relative URL (same origin by construction), false for a link to
+        // another host, and false for `mailto:`/`tel:`, which are not pages.
+        if (! $this->pointsAtCurrentHost()) {
+            return false;
+        }
 
-        return $itemPath !== '' && $itemPath === rtrim(request()->url(), '/');
+        $parts = parse_url($url);
+
+        if ($parts === false) {
+            return false;
+        }
+
+        return static::comparablePath($parts['path'] ?? '')
+            === static::comparablePath((string) parse_url(request()->getRequestUri(), PHP_URL_PATH));
+    }
+
+    /**
+     * A path reduced to what "the same page" means: no trailing slash, and the
+     * root spelled one way.
+     *
+     * The two sides used to be a stored URL and `request()->url()` compared
+     * whole, which meant a relative link could never match an absolute request
+     * URL — and this package's own seeder writes two of them (`/telescope`,
+     * `/horizon`), so the demo menu never highlighted anything. Comparing paths
+     * also drops the differences that are not differences: a fragment (which
+     * `strtok($url, '?')` never removed), a host spelled in another case, an
+     * explicit `:443`, and http against https.
+     *
+     * The request side comes from getRequestUri() rather than getPathInfo()
+     * because an app served from a sub-directory has that prefix in its URLs,
+     * and therefore in the stored link too.
+     */
+    protected static function comparablePath(string $path): string
+    {
+        $path = rtrim($path, '/');
+
+        return $path === '' ? '/' : $path;
     }
 
     /**
