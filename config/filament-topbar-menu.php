@@ -52,6 +52,17 @@ return [
     | The cache is flushed automatically whenever a menu item is created,
     | updated, deleted or reordered.
     |
+    | `cache_key` is a PREFIX, not the whole key: the connection and the table
+    | the menu was read from are appended to it. Both are configurable and both
+    | are read at call time, so without them in the key, changing either would
+    | serve the previous database's menu until the entry expired — with no write
+    | to flush it. An app that swaps the connection per tenant gets the same
+    | scoping for free.
+    |
+    | An app that scopes the menu some other way — a global scope on the model,
+    | say — is invisible from here, and needs either a tenant-aware cache store
+    | or a `cache_key` of its own per tenant.
+    |
     */
 
     'cache_key' => 'filament-topbar-menu.items',

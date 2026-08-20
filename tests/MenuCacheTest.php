@@ -110,6 +110,56 @@ class MenuCacheTest extends TestCase
         $this->assertCount(0, TopbarMenu::items());
     }
 
+    public function test_the_cache_key_names_the_storage_it_holds(): void
+    {
+        $default = TopbarMenu::cacheKey();
+
+        $this->assertStringContainsString('filament_topbar_menu_items', $default);
+        $this->assertStringContainsString('default', $default);
+
+        // Both halves of "where the menu lives" are read from config at call
+        // time, so both belong in the key.
+        config(['filament-topbar-menu.table_name' => 'other_menu_items']);
+        $this->assertNotSame($default, TopbarMenu::cacheKey());
+
+        config(['filament-topbar-menu.table_name' => 'filament_topbar_menu_items']);
+        config(['filament-topbar-menu.connection' => 'menu']);
+        $this->assertNotSame($default, TopbarMenu::cacheKey());
+    }
+
+    public function test_switching_table_does_not_serve_the_previous_tables_menu(): void
+    {
+        TopbarMenuItem::create(['label' => 'On the default table', 'type' => 'url', 'url' => '/a']);
+
+        $this->assertSame('On the default table', TopbarMenu::items()->first()?->label);
+
+        // Point the package at a second table holding a different menu. Under
+        // one global key the snapshot above answered for this one too, until it
+        // expired — the wrong menu, from the wrong database, with no write to
+        // flush it.
+        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 0');
+        config(['filament-topbar-menu.table_name' => 'other_menu_items']);
+
+        TopbarMenuItem::create(['label' => 'On the other table', 'type' => 'url', 'url' => '/b']);
+
+        $this->assertSame('On the other table', TopbarMenu::items()->first()?->label);
+    }
+
+    public function test_flushing_targets_the_key_the_menu_is_actually_cached_under(): void
+    {
+        config(['filament-topbar-menu.table_name' => 'other_menu_items']);
+        DB::statement('CREATE TABLE other_menu_items AS SELECT * FROM filament_topbar_menu_items WHERE 0');
+
+        TopbarMenuItem::create(['label' => 'Item', 'type' => 'url', 'url' => '/a']);
+        TopbarMenu::items();
+
+        $this->assertTrue(Cache::has(TopbarMenu::cacheKey()));
+
+        TopbarMenu::flushCache();
+
+        $this->assertFalse(Cache::has(TopbarMenu::cacheKey()));
+    }
+
     public function test_a_poisoned_cache_payload_is_rebuilt_from_the_database(): void
     {
         TopbarMenuItem::create(['label' => 'Real', 'type' => 'url', 'url' => '/']);

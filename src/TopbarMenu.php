@@ -99,9 +99,34 @@ class TopbarMenu
         }
     }
 
+    /**
+     * The cache key of the menu snapshot, scoped to the storage it was built
+     * from.
+     *
+     * The configured key alone was not enough. Both halves of "where the menu
+     * lives" — `connection` and `table_name` — are read from config at call
+     * time, and the model's own docblock points out that an explicitly assigned
+     * connection (Model::on(), as tenancy code uses) wins over both. So the key
+     * has to name what it holds, or switching either one serves the previous
+     * database's menu until the entry expires, and an app that swaps the
+     * connection per tenant serves whichever tenant happened to write the entry
+     * first — including that tenant's inactive rows and role-restricted items,
+     * since visibility is applied after the cache, not before it.
+     *
+     * Not a complete tenancy story: an app that scopes the menu with a global
+     * scope rather than a connection is invisible from here and still needs a
+     * tenant-aware cache store or its own `cache_key`. Naming the connection and
+     * the table covers what this package itself can vary.
+     */
     public function cacheKey(): string
     {
-        return config('filament-topbar-menu.cache_key', 'filament-topbar-menu.items');
+        $model = new TopbarMenuItem;
+
+        return implode(':', [
+            config('filament-topbar-menu.cache_key', 'filament-topbar-menu.items'),
+            $model->getConnectionName() ?? 'default',
+            $model->getTable(),
+        ]);
     }
 
     /**
