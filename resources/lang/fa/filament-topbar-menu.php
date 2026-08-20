@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'ابتدا یک URL خارجی وارد کنید',
         'favicons_resolved' => ':count فاوآیکون تشخیص داده شد',
         'favicons_overridden' => 'در :count مورد، آیکون تعبیه‌شده بر پیوند اولویت دارد — نوار بالا همان را نشان می‌دهد.',
+        'favicons_stopped' => ':count مورد پردازش نشد — زمان درخواست به پایان رسید. آن‌ها را با دستور refresh-favicons کامل کنید.',
         'import_success' => ':count آیتم منو درون‌ریزی شد',
         'import_invalid' => 'این فایل یک برون‌بری معتبر از منوی نوار بالا نیست',
         'cache_flushed' => 'حافظهٔ نهان منو پاک شد',

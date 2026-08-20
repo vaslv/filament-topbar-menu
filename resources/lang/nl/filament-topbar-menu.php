@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Voer eerst een externe URL in',
         'favicons_resolved' => ':count favicon(s) gevonden',
         'favicons_overridden' => 'Bij :count item(s) gaat een ingesloten pictogram vóór de link — de topbar blijft dat tonen.',
+        'favicons_stopped' => ':count item(s) zijn niet verwerkt — de aanvraag had geen tijd meer. Rond ze af met het commando refresh-favicons.',
         'import_success' => ':count menu-item(s) geïmporteerd',
         'import_invalid' => 'Het bestand is geen geldige export van het topbalkmenu',
         'cache_flushed' => 'Menucache geleegd',

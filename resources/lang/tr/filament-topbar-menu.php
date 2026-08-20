@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Önce harici bir URL girin',
         'favicons_resolved' => ':count favicon çözümlendi',
         'favicons_overridden' => ':count öğede gömülü simge bağlantıya göre önceliklidir — topbar onu göstermeye devam eder.',
+        'favicons_stopped' => ':count öğe işlenmedi — istek için ayrılan süre doldu. Bunları refresh-favicons komutuyla tamamlayın.',
         'import_success' => ':count menü öğesi içe aktarıldı',
         'import_invalid' => 'Dosya geçerli bir üst menü dışa aktarımı değil',
         'cache_flushed' => 'Menü önbelleği temizlendi',

@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'أدخل رابطاً خارجياً أولاً',
         'favicons_resolved' => 'تم تحديد :count من أيقونات المواقع',
         'favicons_overridden' => 'في :count عنصر تتقدّم الأيقونة المضمَّنة على الرابط — وسيظل الشريط يعرضها.',
+        'favicons_stopped' => 'لم تتم معالجة :count عنصر — نفد وقت الطلب. أكملها باستخدام الأمر refresh-favicons.',
         'import_success' => 'تم استيراد :count من عناصر القائمة',
         'import_invalid' => 'الملف ليس تصديراً صالحاً لقائمة الشريط العلوي',
         'cache_flushed' => 'تم مسح ذاكرة القائمة المؤقتة',

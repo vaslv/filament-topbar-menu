@@ -547,8 +547,23 @@ class TopbarMenuItemResource extends Resource
         $resolver = app(FaviconResolver::class);
         $resolved = 0;
         $overridden = 0;
+        $skipped = 0;
+
+        $deadline = microtime(true) + static::bulkFaviconBudget();
 
         foreach ($records as $record) {
+            // Every item is a page fetch plus up to eleven candidate probes,
+            // each bounded by `favicon_resolution_timeout` — and this runs
+            // inside a web request, synchronously, over a selection the admin
+            // chose. Left unbounded it is PHP's own execution limit that ends
+            // it, as a 500 with part of the selection already written and
+            // nothing said about the rest.
+            if (microtime(true) >= $deadline) {
+                $skipped++;
+
+                continue;
+            }
+
             if ($record->type !== TopbarMenuItem::TYPE_URL || blank($record->url)) {
                 continue;
             }
@@ -571,11 +586,33 @@ class TopbarMenuItemResource extends Resource
             ->title(static::trans('notifications.favicons_resolved', ['count' => $resolved]))
             ->success();
 
-        if ($overridden > 0) {
-            $notification->body(static::trans('notifications.favicons_overridden', ['count' => $overridden]));
+        $body = array_filter([
+            $overridden > 0 ? static::trans('notifications.favicons_overridden', ['count' => $overridden]) : null,
+            $skipped > 0 ? static::trans('notifications.favicons_stopped', ['count' => $skipped]) : null,
+        ]);
+
+        if ($body !== []) {
+            $notification->body(implode(' ', $body));
         }
 
         $notification->send();
+    }
+
+    /**
+     * How long the bulk favicon action may spend, in seconds.
+     *
+     * Derived from PHP's own execution limit rather than a config key of its
+     * own, because that limit is the thing this is racing: stopping a few
+     * seconds short of it turns "the request died mid-selection" into a report
+     * of what was done and what was not. A limit of 0 means the deployment set
+     * none, which is common on the CLI and does not make an admin's browser
+     * any more patient — so it is bounded anyway.
+     */
+    protected static function bulkFaviconBudget(): int
+    {
+        $limit = (int) ini_get('max_execution_time');
+
+        return $limit > 0 ? max(5, $limit - 5) : 30;
     }
 
     /**

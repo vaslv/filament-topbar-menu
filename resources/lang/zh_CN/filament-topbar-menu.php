@@ -133,6 +133,7 @@ return [
         'enter_url_first' => '请先输入外部 URL',
         'favicons_resolved' => '已解析 :count 个网站图标',
         'favicons_overridden' => '有 :count 个菜单项的内嵌图标优先于链接，顶栏仍会显示内嵌图标。',
+        'favicons_stopped' => '有 :count 个项目未处理 — 请求已超时。请使用 refresh-favicons 命令完成剩余部分。',
         'import_success' => '已导入 :count 个菜单项',
         'import_invalid' => '该文件不是有效的顶栏菜单导出文件',
         'cache_flushed' => '菜单缓存已清除',

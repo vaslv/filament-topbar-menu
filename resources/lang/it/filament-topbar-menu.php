@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Inserisci prima un URL esterno',
         'favicons_resolved' => ':count favicon individuate',
         'favicons_overridden' => 'Per :count elemento/i un’icona incorporata ha la precedenza sul link — la topbar continua a mostrarla.',
+        'favicons_stopped' => ':count elemento/i non elaborati — la richiesta ha esaurito il tempo. Completali con il comando refresh-favicons.',
         'import_success' => ':count voci di menu importate',
         'import_invalid' => 'Il file non è un\'esportazione valida del menu superiore',
         'cache_flushed' => 'Cache del menu svuotata',

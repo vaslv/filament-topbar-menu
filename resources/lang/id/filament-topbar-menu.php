@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Masukkan URL eksternal terlebih dahulu',
         'favicons_resolved' => ':count favicon berhasil ditentukan',
         'favicons_overridden' => 'Pada :count item, ikon tertanam lebih diutamakan daripada tautan — topbar tetap menampilkannya.',
+        'favicons_stopped' => ':count item tidak diproses — waktu permintaan habis. Selesaikan dengan perintah refresh-favicons.',
         'import_success' => ':count item menu diimpor',
         'import_invalid' => 'File ini bukan ekspor menu bilah atas yang valid',
         'cache_flushed' => 'Cache menu dibersihkan',

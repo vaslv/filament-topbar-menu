@@ -133,6 +133,7 @@ return [
         'enter_url_first' => "Saisissez d'abord une URL externe",
         'favicons_resolved' => ':count favicon(s) résolu(s)',
         'favicons_overridden' => 'Pour :count élément(s), une icône intégrée prévaut sur le lien — la barre continue de l’afficher.',
+        'favicons_stopped' => ':count élément(s) n\'ont pas été traités — la requête a manqué de temps. Terminez-les avec la commande refresh-favicons.',
         'import_success' => ':count élément(s) de menu importé(s)',
         'import_invalid' => "Le fichier n'est pas un export de menu valide",
         'cache_flushed' => 'Cache du menu vidé',

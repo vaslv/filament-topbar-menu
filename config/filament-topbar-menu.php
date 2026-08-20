@@ -107,6 +107,19 @@ return [
 
     'favicon_request_timeout' => 5,
 
+    // The wall-clock budget for resolving ONE item, across every request the
+    // search makes. `favicon_request_timeout` bounds a single request; this
+    // bounds the search, which is what a caller actually waits on. Without it
+    // the worst case is the product of every dimension — the page, up to five
+    // declared icons and six conventional locations, each following up to three
+    // redirects — which is 48 requests, or four minutes at the default timeout,
+    // for one item, inside whatever is calling: an admin's browser, in the case
+    // of the form button and the bulk action.
+    //
+    // Running out of budget is reported the same way a site with no icon is:
+    // nothing is stored and the caller is told none was found.
+    'favicon_resolution_timeout' => 20,
+
     'favicon_max_bytes' => 65536,
 
     /*

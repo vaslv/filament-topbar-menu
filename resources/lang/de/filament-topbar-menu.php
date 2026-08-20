@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Bitte zuerst eine externe URL eingeben',
         'favicons_resolved' => ':count Favicon(s) ermittelt',
         'favicons_overridden' => 'Bei :count Eintrag/Einträgen überschreibt ein eingebettetes Symbol den Link — die Topbar zeigt weiterhin dieses.',
+        'favicons_stopped' => ':count Eintrag/Einträge wurden nicht bearbeitet — die Anfrage hatte keine Zeit mehr. Schließen Sie sie mit dem Befehl refresh-favicons ab.',
         'import_success' => ':count Menüeintrag/-einträge importiert',
         'import_invalid' => 'Die Datei ist kein gültiger Menü-Export',
         'cache_flushed' => 'Menü-Cache geleert',

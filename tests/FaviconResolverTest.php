@@ -3,6 +3,7 @@
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
 use Illuminate\Support\Facades\Http;
+use ReflectionMethod;
 use Vaslv\FilamentTopbarMenu\Support\FaviconResolver;
 
 class FaviconResolverTest extends TestCase
@@ -412,6 +413,50 @@ class FaviconResolverTest extends TestCase
         $favicon = app(FaviconResolver::class)->resolve('https://example.com/admin');
 
         $this->assertSame('https://example.com/admin/favicon.ico', $favicon);
+    }
+
+    public function test_the_search_stops_when_it_runs_out_of_its_budget(): void
+    {
+        Http::fake(['*' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png'])]);
+
+        // `favicon_request_timeout` bounds ONE request; without a bound on the
+        // search itself the worst case is the page plus five declared icons plus
+        // six conventional locations, each following up to three redirects — 48
+        // requests for one item, inside whatever is calling. Here the budget is
+        // spent before the first one, so nothing goes out at all.
+        $resolver = new class extends FaviconResolver
+        {
+            protected function resolutionTimeout(): float
+            {
+                return -1.0;
+            }
+        };
+
+        $this->assertNull($resolver->resolve('https://example.com'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_an_unusable_budget_falls_back_instead_of_removing_the_bound(): void
+    {
+        $timeout = new ReflectionMethod(FaviconResolver::class, 'resolutionTimeout');
+        $resolver = new FaviconResolver;
+
+        // The one thing a misconfigured cap must not do is uncap the search, so
+        // every unusable value lands on the default rather than on zero or on
+        // "no deadline".
+        foreach ([0, -5, 'soon', null, ''] as $configured) {
+            config(['filament-topbar-menu.favicon_resolution_timeout' => $configured]);
+
+            $this->assertSame(
+                20.0,
+                $timeout->invoke($resolver),
+                'A '.var_export($configured, true).' budget must fall back to the default.',
+            );
+        }
+
+        config(['filament-topbar-menu.favicon_resolution_timeout' => 2.5]);
+        $this->assertSame(2.5, $timeout->invoke($resolver));
     }
 
     public function test_an_icon_href_keeps_its_query_string_intact(): void

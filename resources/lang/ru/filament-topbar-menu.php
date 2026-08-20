@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Сначала укажите внешний URL',
         'favicons_resolved' => 'Определено фавиконов: :count',
         'favicons_overridden' => 'У :count пунктов встроенная иконка перекрывает ссылку — в топбаре останется она.',
+        'favicons_stopped' => 'Не обработано пунктов: :count — запрос исчерпал отведённое время. Доделайте их командой refresh-favicons.',
         'import_success' => 'Импортировано пунктов меню: :count',
         'import_invalid' => 'Файл не является корректным экспортом меню',
         'cache_flushed' => 'Кэш меню сброшен',

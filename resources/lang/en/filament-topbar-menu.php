@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Enter an external URL first',
         'favicons_resolved' => ':count favicon(s) resolved',
         'favicons_overridden' => 'An embedded icon overrides the link on :count item(s) — the topbar keeps showing it.',
+        'favicons_stopped' => ':count item(s) were not attempted — the request ran out of time. Finish them with the refresh-favicons command.',
         'import_success' => ':count menu item(s) imported',
         'import_invalid' => 'The file is not a valid topbar menu export',
         'cache_flushed' => 'Menu cache flushed',

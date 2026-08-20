@@ -133,6 +133,7 @@ return [
         'enter_url_first' => 'Informe primeiro uma URL externa',
         'favicons_resolved' => ':count favicon(s) resolvido(s)',
         'favicons_overridden' => 'Em :count item(ns) um ícone incorporado tem prioridade sobre o link — a topbar continua exibindo-o.',
+        'favicons_stopped' => ':count item(ns) não foram processados — a requisição ficou sem tempo. Conclua-os com o comando refresh-favicons.',
         'import_success' => ':count item(ns) de menu importado(s)',
         'import_invalid' => 'O arquivo não é uma exportação válida do menu superior',
         'cache_flushed' => 'Cache do menu limpo',

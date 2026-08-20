@@ -49,6 +49,11 @@ class FaviconResolver
     protected const MAX_ICON_CANDIDATES = 5;
 
     /**
+     * Fallback for `favicon_resolution_timeout` — see the config file.
+     */
+    protected const DEFAULT_RESOLUTION_TIMEOUT = 20;
+
+    /**
      * The conventional icon file names, tried in this order inside each
      * candidate directory.
      *
@@ -72,6 +77,16 @@ class FaviconResolver
         'favicon.svg',
         'favicon.png',
     ];
+
+    /**
+     * When the search running right now must stop, as a `microtime(true)`
+     * value, or null outside a search.
+     *
+     * Instance state rather than a parameter threaded through five methods:
+     * locate() is the only entry point and the search is not reentrant, so the
+     * deadline is set on the way in and cleared on the way out.
+     */
+    protected ?float $deadline = null;
 
     /**
      * The URL of the site's favicon, to be stored as a link. The visitor's own
@@ -146,36 +161,70 @@ class FaviconResolver
 
         $base = $scheme.'://'.$host.($port ? ':'.$port : '');
 
-        // 1. The icon the page itself declares, which is the one a browser
-        //    shows in the tab for exactly this URL. A sub-page (a Horizon or
-        //    Telescope dashboard, a docs section) usually overrides the site
-        //    icon this way, so asking the page first is what makes the stored
-        //    favicon match what the link actually leads to.
-        $declared = $this->resolveFromHtml($url, $accept);
+        $this->deadline = microtime(true) + $this->resolutionTimeout();
 
-        if ($declared !== null) {
-            return $declared;
-        }
+        try {
+            // 1. The icon the page itself declares, which is the one a browser
+            //    shows in the tab for exactly this URL. A sub-page (a Horizon or
+            //    Telescope dashboard, a docs section) usually overrides the site
+            //    icon this way, so asking the page first is what makes the stored
+            //    favicon match what the link actually leads to.
+            $declared = $this->resolveFromHtml($url, $accept);
 
-        // 2. Fall back to the conventional locations, for pages that declare
-        //    nothing (or that the resolver cannot read — it browses
-        //    anonymously, so a page behind auth answers 401/403 here). The
-        //    directory the link points at is tried before the host root, so an
-        //    app mounted on a sub-path keeps its own icon, and each is tried in
-        //    every conventional format, not just `.ico`.
-        foreach ($this->conventionalFaviconUrls($base, (string) (parse_url($url, PHP_URL_PATH) ?: '/')) as $faviconUrl) {
-            if (! $this->isStorableFaviconUrl($faviconUrl)) {
-                continue;
+            if ($declared !== null) {
+                return $declared;
             }
 
-            $body = $this->fetchFavicon($faviconUrl);
+            // 2. Fall back to the conventional locations, for pages that declare
+            //    nothing (or that the resolver cannot read — it browses
+            //    anonymously, so a page behind auth answers 401/403 here). The
+            //    directory the link points at is tried before the host root, so an
+            //    app mounted on a sub-path keeps its own icon, and each is tried in
+            //    every conventional format, not just `.ico`.
+            foreach ($this->conventionalFaviconUrls($base, (string) (parse_url($url, PHP_URL_PATH) ?: '/')) as $faviconUrl) {
+                if ($this->isOutOfTime()) {
+                    break;
+                }
 
-            if ($body !== null && ($accept === null || $accept($body))) {
-                return ['url' => $faviconUrl, 'body' => $body];
+                if (! $this->isStorableFaviconUrl($faviconUrl)) {
+                    continue;
+                }
+
+                $body = $this->fetchFavicon($faviconUrl);
+
+                if ($body !== null && ($accept === null || $accept($body))) {
+                    return ['url' => $faviconUrl, 'body' => $body];
+                }
             }
+
+            return null;
+        } finally {
+            $this->deadline = null;
+        }
+    }
+
+    /**
+     * The wall-clock budget for resolving one item, in seconds. A value that is
+     * not a positive number falls back to the default rather than removing the
+     * bound, which is the one thing a misconfigured cap must not do.
+     */
+    protected function resolutionTimeout(): float
+    {
+        $configured = config('filament-topbar-menu.favicon_resolution_timeout', self::DEFAULT_RESOLUTION_TIMEOUT);
+
+        if (! is_numeric($configured) || (float) $configured <= 0) {
+            return (float) self::DEFAULT_RESOLUTION_TIMEOUT;
         }
 
-        return null;
+        return (float) $configured;
+    }
+
+    /**
+     * Whether the search running right now has spent its budget.
+     */
+    protected function isOutOfTime(): bool
+    {
+        return $this->deadline !== null && microtime(true) >= $this->deadline;
     }
 
     /**
@@ -341,6 +390,10 @@ class FaviconResolver
         asort($candidates);
 
         foreach (array_keys($candidates) as $candidate) {
+            if ($this->isOutOfTime()) {
+                break;
+            }
+
             // The candidate must resolve to a real image, so a wrong href isn't
             // saved as a silently-broken favicon.
             $body = $this->fetchFavicon($candidate);
@@ -608,6 +661,10 @@ class FaviconResolver
 
         try {
             for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
+                if ($this->isOutOfTime()) {
+                    return null;
+                }
+
                 $finalUrl = $url;
 
                 $host = parse_url($url, PHP_URL_HOST);
