@@ -414,6 +414,86 @@ class FaviconResolverTest extends TestCase
         $this->assertSame('https://example.com/admin/favicon.ico', $favicon);
     }
 
+    public function test_an_icon_href_keeps_its_query_string_intact(): void
+    {
+        Http::fake([
+            'https://example.com/icon.png?url=https://cdn.example/x' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/app' => Http::response(
+                '<html><head><link rel="icon" href="/icon.png?url=https://cdn.example/x"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // The query used to go through the path normaliser with the path: a
+        // `//` in a value was collapsed and a `/../` in one rewrote the path
+        // itself, so the resolver probed a URL the page never declared.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/app');
+
+        $this->assertSame('https://example.com/icon.png?url=https://cdn.example/x', $favicon);
+    }
+
+    public function test_a_query_value_cannot_rewrite_the_path_it_belongs_to(): void
+    {
+        Http::fake([
+            'https://example.com/icon.png?a=/../b' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/app' => Http::response(
+                '<html><head><link rel="icon" href="/icon.png?a=/../b"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // This one resolved to `https://example.com/b` — a different resource,
+        // chosen by the contents of a query value.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/app');
+
+        $this->assertSame('https://example.com/icon.png?a=/../b', $favicon);
+    }
+
+    public function test_a_double_slash_inside_a_path_is_part_of_the_path(): void
+    {
+        Http::fake([
+            'https://example.com/cdn-cgi/image/width=32/https://origin.test/icon.png' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/app' => Http::response(
+                '<html><head><link rel="icon" href="/cdn-cgi/image/width=32/https://origin.test/icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // The shape Cloudflare Image Resizing emits. An empty segment is a
+        // literal part of a path — only `.` and `..` are resolved away — so
+        // collapsing it built a URL the origin does not serve and the page's
+        // declared icon was skipped for a guess at conventional file names.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/app');
+
+        $this->assertSame('https://example.com/cdn-cgi/image/width=32/https://origin.test/icon.png', $favicon);
+    }
+
+    public function test_a_query_only_href_keeps_the_pages_own_path(): void
+    {
+        Http::fake([
+            'https://example.com/app/index.php?icon=1' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            'https://example.com/app/index.php' => Http::response(
+                '<html><head><link rel="icon" href="?icon=1"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // RFC 3986 §5.3: a query-only reference replaces the query and keeps
+        // the base path. Treating it as path-relative pointed at the directory
+        // (`/app/?icon=1`), which is not what a browser fetches.
+        $favicon = app(FaviconResolver::class)->resolve('https://example.com/app/index.php');
+
+        $this->assertSame('https://example.com/app/index.php?icon=1', $favicon);
+    }
+
     public function test_a_base_tag_pointing_at_another_host_is_honored_like_a_browser_does(): void
     {
         Http::fake([

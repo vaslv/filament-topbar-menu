@@ -488,48 +488,109 @@ class FaviconResolver
         $port = parse_url($pageUrl, PHP_URL_PORT);
         $authority = $scheme.'://'.$host.($port ? ':'.$port : '');
 
+        // The query and the fragment are split off before any of the path
+        // arithmetic below. normalizePath() resolves `.` and `..` segments, and
+        // those are ordinary characters inside a query value: an icon href of
+        // `/icon.png?a=/../b` came back as `/b`, a different resource
+        // altogether, and a Cloudflare image href
+        // (`/cdn-cgi/image/width=32/https://host/icon.png`) lost a slash. The
+        // suffix is carried through verbatim.
+        [$path, $suffix] = $this->splitReference($href);
+
+        // Query-only (`?v=2`) or fragment-only (`#x`): the base path stands and
+        // only the part given is replaced (RFC 3986 §5.3). Resolving these
+        // against the page's DIRECTORY, as a path-relative reference, pointed at
+        // `/app/?v=2` where a browser reads `/app/index.php?v=2`.
+        if ($path === '') {
+            $pagePath = parse_url($pageUrl, PHP_URL_PATH) ?: '/';
+            $pageQuery = parse_url($pageUrl, PHP_URL_QUERY);
+
+            // A fragment keeps the base query as well; a query replaces it.
+            if (str_starts_with($suffix, '#') && filled($pageQuery)) {
+                $pagePath .= '?'.$pageQuery;
+            }
+
+            return $authority.$pagePath.$suffix;
+        }
+
         // Root-relative: /icon.png
-        if (str_starts_with($href, '/')) {
-            return $authority.$this->normalizePath($href);
+        if (str_starts_with($path, '/')) {
+            return $authority.$this->normalizePath($path).$suffix;
         }
 
         // Path-relative: resolve against the page's directory.
-        $path = parse_url($pageUrl, PHP_URL_PATH) ?: '/';
-        $directory = substr($path, 0, strrpos($path, '/') + 1) ?: '/';
+        $pagePath = parse_url($pageUrl, PHP_URL_PATH) ?: '/';
+        $directory = substr($pagePath, 0, strrpos($pagePath, '/') + 1) ?: '/';
 
-        return $authority.$this->normalizePath($directory.$href);
+        return $authority.$this->normalizePath($directory.$path).$suffix;
     }
 
     /**
-     * Collapse `.` and `..` segments in an absolute path, keeping a trailing
-     * slash where the path had one.
+     * Split a reference into its path and everything from the first `?` or `#`
+     * onwards, so only the path is put through normalizePath().
+     *
+     * @return array{string, string}
+     */
+    protected function splitReference(string $reference): array
+    {
+        $length = strcspn($reference, '?#');
+
+        return [substr($reference, 0, $length), substr($reference, $length)];
+    }
+
+    /**
+     * Resolve `.` and `..` segments in an absolute path, the way RFC 3986's
+     * remove_dot_segments does, keeping a trailing slash where the path has one.
      *
      * The slash is not cosmetic: it is what makes a path a directory, and every
      * relative reference underneath it resolves one level differently without it
      * (`/admin/` + `favicon.ico` is `/admin/favicon.ico`, `/admin` + the same is
      * `/favicon.ico`). A path ending in `.` or `..` denotes a directory too.
+     *
+     * An EMPTY segment is kept, unlike `.` and `..`. `//` inside a path is a
+     * literal part of it — a Cloudflare image href is
+     * `/cdn-cgi/image/width=32/https://host/icon.png` — and dropping it built a
+     * URL the origin does not serve, so the page's declared icon was quietly
+     * skipped in favour of guessing at conventional file names. Only the leading
+     * empty segment is dropped, because that one is the root marker rather than
+     * a segment.
      */
     protected function normalizePath(string $path): string
     {
-        $segments = [];
+        if ($path === '') {
+            return '/';
+        }
 
-        foreach (explode('/', $path) as $segment) {
-            if ($segment === '' || $segment === '.') {
+        $input = explode('/', $path);
+
+        if ($input[0] === '') {
+            array_shift($input);
+        }
+
+        $segments = [];
+        $endsAtDirectory = false;
+
+        foreach ($input as $segment) {
+            if ($segment === '.') {
+                $endsAtDirectory = true;
+
                 continue;
             }
 
             if ($segment === '..') {
                 array_pop($segments);
+                $endsAtDirectory = true;
 
                 continue;
             }
 
             $segments[] = $segment;
+            $endsAtDirectory = false;
         }
 
         $normalized = '/'.implode('/', $segments);
 
-        if ($normalized !== '/' && preg_match('#(/|/\.|/\.\.)$#', $path) === 1) {
+        if ($endsAtDirectory && ! str_ends_with($normalized, '/')) {
             $normalized .= '/';
         }
 
