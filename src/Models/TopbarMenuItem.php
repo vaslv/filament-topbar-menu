@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
@@ -131,6 +132,40 @@ class TopbarMenuItem extends Model
             'sort' => 'integer',
         ];
     }
+
+    /**
+     * Per-instance memos for the derived values the render path asks for
+     * repeatedly.
+     *
+     * The menu renders twice on every panel page (the desktop copy and the
+     * mobile one), and within each copy a dropdown group is asked about several
+     * times over: `visibleChildren()` five times per group, `displayIcon()`
+     * once per copy, `isActive()` once per item plus once per child through
+     * `isBranchActive()`. Every one of those is a pure function of the model and
+     * the request, so recomputing it can only produce the same answer — after a
+     * base64 decode of up to 64 KB, or two ICU calls, or both.
+     *
+     * The request-dependent memos carry the Request OBJECT they were computed
+     * for, and the value-dependent ones carry the value, so a memo can never
+     * answer for inputs it was not computed from. Holding the request itself
+     * rather than an id is deliberate: an id can be reused once the object it
+     * named is collected, and these answers decide what a menu shows.
+     *
+     * @var array{0: Request, 1: bool}|null
+     */
+    private ?array $pointsAtCurrentHostMemo = null;
+
+    /** @var array{0: Request, 1: bool}|null */
+    private ?array $isActiveMemo = null;
+
+    /** @var array{0: Request, 1: string, 2: Collection<int, TopbarMenuItem>}|null */
+    private ?array $visibleChildrenMemo = null;
+
+    /** @var array{0: ?string, 1: bool}|null */
+    private ?array $faviconDataMemo = null;
+
+    /** @var array{0: ?string, 1: ?string}|null */
+    private ?array $safeIconMemo = null;
 
     public function getTable(): string
     {
@@ -402,6 +437,21 @@ class TopbarMenuItem extends Model
      */
     public function isActive(): bool
     {
+        $request = request();
+
+        if ($this->isActiveMemo !== null && $this->isActiveMemo[0] === $request) {
+            return $this->isActiveMemo[1];
+        }
+
+        $verdict = $this->determineIsActive();
+
+        $this->isActiveMemo = [$request, $verdict];
+
+        return $verdict;
+    }
+
+    protected function determineIsActive(): bool
+    {
         if ($this->type === self::TYPE_ROUTE) {
             return filled($this->route)
                 && Route::has($this->route)
@@ -539,9 +589,27 @@ class TopbarMenuItem extends Model
      */
     public function visibleChildren(?Authenticatable $user = null): Collection
     {
-        return $this->activeChildren
+        // Keyed by the request AND the user: `activeChildren` is a fixed
+        // hydrated relation by the time any of this runs, but isVisibleTo()
+        // reads both — `hide_on_current_domain` compares against the request's
+        // host. One slot is enough for the render path, which asks the same
+        // group about the same user five times over.
+        $request = request();
+        $key = $user === null ? 'guest' : 'user:'.((string) $user->getAuthIdentifier());
+
+        if ($this->visibleChildrenMemo !== null
+            && $this->visibleChildrenMemo[0] === $request
+            && $this->visibleChildrenMemo[1] === $key) {
+            return $this->visibleChildrenMemo[2];
+        }
+
+        $visible = $this->activeChildren
             ->filter(fn (self $child): bool => $child->isVisibleTo($user))
             ->values();
+
+        $this->visibleChildrenMemo = [$request, $key, $visible];
+
+        return $visible;
     }
 
     /**
@@ -581,6 +649,24 @@ class TopbarMenuItem extends Model
      * the app's configured URL, so the comparison stays deterministic.
      */
     public function pointsAtCurrentHost(): bool
+    {
+        $request = request();
+
+        if ($this->pointsAtCurrentHostMemo !== null && $this->pointsAtCurrentHostMemo[0] === $request) {
+            return $this->pointsAtCurrentHostMemo[1];
+        }
+
+        $verdict = $this->determinePointsAtCurrentHost();
+
+        $this->pointsAtCurrentHostMemo = [$request, $verdict];
+
+        return $verdict;
+    }
+
+    /**
+     * The uncached answer — see pointsAtCurrentHost() for the decision tree.
+     */
+    protected function determinePointsAtCurrentHost(): bool
     {
         // An explicit type guard, not a side effect of route() generating
         // current-host URLs: hiding a route item must never happen, even when
@@ -741,7 +827,7 @@ class TopbarMenuItem extends Model
         // broken image the embedding exists to avoid. It is validated on the way
         // out, not trusted: the column may hold anything on a fleet-shared menu
         // table, and this value goes straight into an <img src>.
-        if (static::isStorableFaviconData($this->favicon_data)) {
+        if ($this->hasStorableFaviconData()) {
             return $this->favicon_data;
         }
 
@@ -759,7 +845,52 @@ class TopbarMenuItem extends Model
             return $this->favicon_url;
         }
 
-        return static::safeIconName($this->icon);
+        return $this->safeIcon();
+    }
+
+    /**
+     * isStorableFaviconData() for THIS record's stored value, computed once.
+     *
+     * That check is an anchored regex plus a base64 decode over a column that
+     * holds up to `favicon_max_bytes` of image — 87 KB of base64 at the default
+     * cap — and it ran on every render of every item, twice per page because the
+     * menu renders twice. The memo carries the value it judged, so changing the
+     * attribute invalidates it.
+     */
+    protected function hasStorableFaviconData(): bool
+    {
+        $value = $this->favicon_data;
+
+        if ($this->faviconDataMemo !== null && $this->faviconDataMemo[0] === $value) {
+            return $this->faviconDataMemo[1];
+        }
+
+        $verdict = static::isStorableFaviconData($value);
+
+        $this->faviconDataMemo = [$value, $verdict];
+
+        return $verdict;
+    }
+
+    /**
+     * safeIconName() for THIS record's stored value, computed once.
+     *
+     * Validating a name means asking blade-icons to render it, which reaches the
+     * icon-set resolver and the filesystem behind it.
+     */
+    protected function safeIcon(): ?string
+    {
+        $value = $this->icon;
+
+        if ($this->safeIconMemo !== null && $this->safeIconMemo[0] === $value) {
+            return $this->safeIconMemo[1];
+        }
+
+        $name = static::safeIconName($value);
+
+        $this->safeIconMemo = [$value, $name];
+
+        return $name;
     }
 
     /**

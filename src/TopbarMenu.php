@@ -11,6 +11,25 @@ use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 class TopbarMenu
 {
     /**
+     * The tree resolved for this request, or null before it has been.
+     *
+     * The plugin registers the menu at TWO render hooks — the desktop copy and
+     * the mobile one — so every panel page ran the whole pipeline twice: a cache
+     * read, a snapshot validation, and a full rehydration into fresh models.
+     * The second pass could only ever produce what the first one did.
+     *
+     * Reusing the models is also what makes the per-instance memos on
+     * TopbarMenuItem (displayIcon, isActive, visibleChildren) pay off across
+     * both copies rather than within one of them.
+     *
+     * The binding is scoped rather than a singleton (see the service provider),
+     * so this lives exactly as long as the request that filled it.
+     *
+     * @var Collection<int, TopbarMenuItem>|null
+     */
+    protected ?Collection $resolved = null;
+
+    /**
      * The menu tree: active root items (ordered by `sort`) with their active
      * children eager loaded.
      *
@@ -25,6 +44,10 @@ class TopbarMenu
      */
     public function items(): Collection
     {
+        if ($this->resolved !== null) {
+            return $this->resolved;
+        }
+
         try {
             $cached = $this->remember();
 
@@ -37,7 +60,7 @@ class TopbarMenu
                 Cache::put($this->cacheKey(), $cached, config('filament-topbar-menu.cache_ttl', 3600));
             }
 
-            return $this->hydrate($cached);
+            return $this->resolved = $this->hydrate($cached);
         } catch (Throwable $e) {
             // The menu is chrome rendered on every panel page — it must never
             // take the whole app down. Degrade to an empty menu and report the
@@ -63,6 +86,8 @@ class TopbarMenu
             // misconfigured connection even when the snapshot came from cache.
             report($e);
 
+            // Not memoized: a fault is not an answer to keep for the rest of
+            // the request, and the second render hook costs nothing to retry.
             return new Collection;
         }
     }
@@ -92,6 +117,11 @@ class TopbarMenu
      */
     public function flushCache(): void
     {
+        // The in-request memo goes first and unconditionally. Every write in
+        // this package flushes through here, so a save during the request must
+        // not leave the pre-save tree standing for whatever renders next.
+        $this->resolved = null;
+
         try {
             Cache::forget($this->cacheKey());
         } catch (Throwable $e) {

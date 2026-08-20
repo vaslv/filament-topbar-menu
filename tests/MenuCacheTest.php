@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Facade;
 use Vaslv\FilamentTopbarMenu\Facades\TopbarMenu;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 
@@ -71,6 +72,54 @@ class MenuCacheTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertCount(0, DB::getQueryLog());
+    }
+
+    public function test_the_menu_is_resolved_once_per_request_however_often_it_is_rendered(): void
+    {
+        TopbarMenuItem::create(['label' => 'Home', 'type' => 'url', 'url' => '/']);
+
+        // Warm it, then watch. The plugin renders the menu at two hooks on
+        // every panel page, so the second copy used to repeat the whole
+        // pipeline: a cache read, a snapshot validation and a full rehydration.
+        $first = TopbarMenu::items();
+
+        Cache::forget(TopbarMenu::cacheKey());
+
+        // Nothing reaches the store or the database on the second call, so
+        // dropping the entry underneath it changes nothing.
+        $second = TopbarMenu::items();
+
+        $this->assertCount(1, $second);
+        $this->assertSame($first->first(), $second->first(), 'Both copies must render from the same models.');
+    }
+
+    public function test_a_write_during_the_request_invalidates_the_in_request_menu_too(): void
+    {
+        TopbarMenuItem::create(['label' => 'First', 'type' => 'url', 'url' => '/a']);
+
+        $this->assertCount(1, TopbarMenu::items());
+
+        // Saving flushes through the model's saved hook. A memo that survived
+        // that would let the rest of the request render the pre-save tree.
+        TopbarMenuItem::create(['label' => 'Second', 'type' => 'url', 'url' => '/b']);
+
+        $this->assertCount(2, TopbarMenu::items());
+    }
+
+    public function test_the_resolved_menu_does_not_outlive_the_request(): void
+    {
+        TopbarMenuItem::create(['label' => 'Home', 'type' => 'url', 'url' => '/']);
+
+        $first = TopbarMenu::items()->first();
+
+        // What Octane does between requests, both halves of it: the container
+        // drops scoped instances and the facades drop their resolved ones. A
+        // singleton binding would have carried this request's models into the
+        // next one regardless.
+        $this->app->forgetScopedInstances();
+        Facade::clearResolvedInstances();
+
+        $this->assertNotSame($first, TopbarMenu::items()->first());
     }
 
     public function test_the_cache_is_flushed_when_an_item_is_created(): void

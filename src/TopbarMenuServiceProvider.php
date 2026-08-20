@@ -13,7 +13,14 @@ class TopbarMenuServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/filament-topbar-menu.php', 'filament-topbar-menu');
 
-        $this->app->singleton(TopbarMenu::class);
+        // scoped(), not singleton(): TopbarMenu memoizes the resolved menu for
+        // the request, because the plugin renders the menu twice on every panel
+        // page (desktop copy plus mobile copy). A scoped binding is one instance
+        // per request and per queued job, and Octane flushes it between
+        // requests — a singleton would carry one request's menu into the next.
+        $this->app->scoped(TopbarMenu::class);
+
+        // Stateless, so a singleton is right here.
         $this->app->singleton(FaviconResolver::class);
     }
 

@@ -63,6 +63,12 @@ class RenderResilienceTest extends TestCase
 
         config(['filament-topbar-menu.connection' => 'does-not-exist']);
 
+        // A new request against a warm cache: the snapshot is served from the
+        // store, so only hydrate() touches the connection. The scoped binding
+        // is what a request boundary resets, and Octane and the queue worker
+        // reset it the same way.
+        $this->app->forgetScopedInstances();
+
         $this->assertCount(0, app(TopbarMenu::class)->items());
     }
 

@@ -250,6 +250,71 @@ class TopbarMenuItemTest extends TestCase
         }
     }
 
+    public function test_the_derived_answers_follow_the_request_they_are_asked_in(): void
+    {
+        // The render path asks the same instance the same questions many times
+        // over, so the answers are memoized — but a memo that outlived its
+        // inputs would be worse than no memo at all. Each of these is asked
+        // twice on one instance, with the request changed in between.
+        $item = new TopbarMenuItem(['type' => 'url', 'url' => 'https://myapp.test/dashboard']);
+
+        $this->bindRequest('https://myapp.test/dashboard');
+        $this->assertTrue($item->isActive());
+        $this->assertTrue($item->pointsAtCurrentHost());
+
+        $this->bindRequest('https://myapp.test/reports');
+        $this->assertFalse($item->isActive());
+        $this->assertTrue($item->pointsAtCurrentHost());
+
+        $this->bindRequest('https://elsewhere.test/dashboard');
+        $this->assertFalse($item->isActive());
+        $this->assertFalse($item->pointsAtCurrentHost());
+    }
+
+    public function test_visible_children_follow_the_request_and_the_user(): void
+    {
+        $group = TopbarMenuItem::create(['label' => 'Group', 'type' => 'url', 'url' => null]);
+
+        TopbarMenuItem::create([
+            'label' => 'Hidden at home',
+            'type' => 'url',
+            'url' => 'https://a.example.com/tools',
+            'parent_id' => $group->id,
+            'visibility' => ['hide_on_current_domain' => true],
+        ]);
+
+        $group->load('activeChildren');
+
+        $this->bindRequest('https://a.example.com/admin');
+        $this->assertCount(0, $group->visibleChildren());
+
+        // Same instance, same relation, different host: the answer has to move.
+        $this->bindRequest('https://b.example.com/admin');
+        $this->assertCount(1, $group->visibleChildren());
+    }
+
+    public function test_the_display_icon_follows_the_value_it_was_computed_from(): void
+    {
+        $item = new TopbarMenuItem([
+            'type' => 'url',
+            'url' => 'https://example.com',
+            'icon' => 'heroicon-o-book-open',
+        ]);
+
+        $this->assertSame('heroicon-o-book-open', $item->displayIcon());
+
+        // The embedded icon wins once it is set, memo or no memo.
+        $item->favicon_data = 'data:image/png;base64,'.base64_encode(self::PNG);
+        $this->assertSame($item->favicon_data, $item->displayIcon());
+
+        // And stops winning when it stops being storable.
+        $item->favicon_data = 'data:text/html;base64,'.base64_encode('<script>');
+        $this->assertSame('heroicon-o-book-open', $item->displayIcon());
+
+        $item->icon = 'heroicon-o-does-not-exist';
+        $this->assertNull($item->displayIcon());
+    }
+
     public function test_a_group_is_active_when_one_of_its_children_is_active(): void
     {
         $this->bindRequest('https://myapp.test/reports');
