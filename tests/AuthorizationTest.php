@@ -2,6 +2,7 @@
 
 namespace Vaslv\FilamentTopbarMenu\Tests;
 
+use Filament\Actions\Action;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -21,10 +22,16 @@ use Filament\Tables\Table;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use ReflectionMethod;
 use ReflectionProperty;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
+use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages\ListTopbarMenuItems;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
+use Vaslv\FilamentTopbarMenu\Support\MenuTransfer;
 use Vaslv\FilamentTopbarMenu\Tests\Fixtures\RoleAwareUser;
 use Vaslv\FilamentTopbarMenu\Tests\Fixtures\TestPanelProvider;
 use Vaslv\FilamentTopbarMenu\Tests\Fixtures\TopbarMenuItemPolicy;
@@ -198,5 +205,93 @@ class AuthorizationTest extends TestCase
 
         $this->actingAsUserAllowedTo('viewAny', 'view', 'reorder');
         $this->assertTrue($table->isReorderAuthorized());
+    }
+
+    /**
+     * A menu export as the import action receives it: a real
+     * TemporaryUploadedFile, because that is what the action reads.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function uploadedExport(array $payload): TemporaryUploadedFile
+    {
+        config(['livewire.temporary_file_upload.disk' => 'local']);
+        Storage::fake('local');
+
+        Storage::disk('local')->put(
+            FileUploadConfiguration::path('menu.json', false),
+            (string) json_encode($payload),
+        );
+
+        return new TemporaryUploadedFile('menu.json', 'local');
+    }
+
+    protected function importAction(ListTopbarMenuItems $page): Action
+    {
+        /** @var Action $action */
+        $action = (new ReflectionMethod($page, 'importAction'))->invoke($page);
+
+        return $action;
+    }
+
+    public function test_the_import_ignores_replace_for_a_user_who_cannot_delete(): void
+    {
+        $existing = TopbarMenuItem::create(['label' => 'Existing', 'url' => 'https://existing.test']);
+
+        $this->actingAsUserAllowedTo('viewAny', 'view', 'create');
+
+        $file = $this->uploadedExport([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [['label' => 'Imported', 'url' => 'https://imported.test']],
+        ]);
+
+        $this->importAction(new ListTopbarMenuItems)->call([
+            'data' => ['file' => $file, 'replace' => true],
+        ]);
+
+        // The toggle is hidden without the delete policy, but form state is
+        // client-controlled — the action re-checks, and this is that check. Its
+        // removal would let a create-only user wipe the whole menu, and on a
+        // fleet-shared table that is every app's menu.
+        $this->assertTrue($existing->exists());
+        $this->assertSame(2, TopbarMenuItem::query()->count());
+        $this->assertSame(1, TopbarMenuItem::query()->where('label', 'Existing')->count());
+    }
+
+    public function test_the_import_honours_replace_for_a_user_who_can_delete(): void
+    {
+        TopbarMenuItem::create(['label' => 'Existing', 'url' => 'https://existing.test']);
+
+        $this->actingAsUserAllowedTo('viewAny', 'view', 'create', 'delete', 'deleteAny');
+
+        $file = $this->uploadedExport([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [['label' => 'Imported', 'url' => 'https://imported.test']],
+        ]);
+
+        $this->importAction(new ListTopbarMenuItems)->call([
+            'data' => ['file' => $file, 'replace' => true],
+        ]);
+
+        // The other half: the guard must not have turned into a refusal.
+        $this->assertSame(1, TopbarMenuItem::query()->count());
+        $this->assertSame('Imported', TopbarMenuItem::query()->firstOrFail()->label);
+    }
+
+    public function test_a_file_that_is_not_an_export_is_reported_rather_than_thrown(): void
+    {
+        $this->actingAsUserAllowedTo('viewAny', 'view', 'create');
+
+        $file = $this->uploadedExport(['not' => 'a menu']);
+
+        // The action decodes untrusted bytes; a 500 on the list page is not the
+        // answer to a wrong file.
+        $this->importAction(new ListTopbarMenuItems)->call([
+            'data' => ['file' => $file, 'replace' => false],
+        ]);
+
+        $this->assertSame(0, TopbarMenuItem::query()->count());
     }
 }

@@ -1012,4 +1012,113 @@ class FaviconResolverTest extends TestCase
         // asking for the bytes instead of the link.
         Http::assertNothingSent();
     }
+
+    public function test_an_internal_address_declared_by_the_page_is_refused(): void
+    {
+        Http::fake([
+            'https://example.com/app' => Http::response(
+                '<html><head><link rel="icon" href="http://169.254.169.254/latest/meta-data/icon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // The SSRF guard was covered for a redirect hop but never for the other
+        // way an internal address arrives: the page simply declaring one. The
+        // href passes isStorableFaviconUrl() — it is a well-formed http URL —
+        // and nothing but hostIsBlocked() inside request() stops it.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com/app'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '169.254.169.254'));
+    }
+
+    public function test_an_internal_address_declared_by_the_page_is_refused_when_embedding_too(): void
+    {
+        Http::fake([
+            'https://example.com/app' => Http::response(
+                '<html><head><link rel="icon" href="http://127.0.0.1:9200/favicon.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // Both entry points share locate(), but only one of them was pinned.
+        $this->assertNull(app(FaviconResolver::class)->resolveEmbedded('https://example.com/app'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '127.0.0.1'));
+    }
+
+    public function test_a_base_tag_cannot_point_the_search_at_an_internal_host(): void
+    {
+        Http::fake([
+            'https://example.com/app' => Http::response(
+                '<html><head><base href="http://127.0.0.1:8000/"><link rel="icon" href="favicon.ico"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // documentBaseUrl() honors a cross-host <base> the way a browser does,
+        // and its docblock leans on "every candidate built from it still goes
+        // through that check". The only base-tag test that changed host pointed
+        // at a public CDN, so that sentence had never been tested.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com/app'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '127.0.0.1'));
+    }
+
+    public function test_a_redirect_chain_is_bounded(): void
+    {
+        Http::fake([
+            'https://example.com/a' => Http::response('', 301, ['Location' => '/b']),
+            'https://example.com/b' => Http::response('', 301, ['Location' => '/c']),
+            'https://example.com/c' => Http::response('', 301, ['Location' => '/d']),
+            'https://example.com/d' => Http::response('', 301, ['Location' => '/e']),
+            'https://example.com/e' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png']),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        // MAX_REDIRECTS is 3, so the fifth URL is never reached. Nothing tested
+        // a chain longer than one hop, and this fetch runs synchronously inside
+        // a panel request — an unbounded loop there hangs a worker on a host
+        // that chooses to redirect forever.
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com/a'));
+
+        Http::assertNotSent(fn ($request): bool => str_ends_with($request->url(), '/e'));
+    }
+
+    public function test_a_redirect_loop_does_not_spin(): void
+    {
+        Http::fake([
+            'https://example.com/loop' => Http::response('', 302, ['Location' => '/loop']),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com/loop'));
+    }
+
+    public function test_a_huge_page_is_only_read_up_to_the_body_cap(): void
+    {
+        // The icon is declared past MAX_BODY_BYTES, so a resolver that read the
+        // whole body would find it. Removing the cap restores unbounded
+        // buffering of an attacker-controlled response, and nothing would have
+        // noticed: no test ever faked a body larger than a few hundred bytes.
+        $padding = str_repeat('<!-- x -->', 300_000);
+
+        Http::fake([
+            'https://example.com/huge' => Http::response(
+                '<html><head>'.$padding.'<link rel="icon" href="/late.png"></head></html>',
+                200,
+                ['Content-Type' => 'text/html'],
+            ),
+            '*' => Http::response('Not Found', 404),
+        ]);
+
+        $this->assertNull(app(FaviconResolver::class)->resolve('https://example.com/huge'));
+
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'late.png'));
+    }
 }

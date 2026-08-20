@@ -162,7 +162,15 @@ class FaviconActionsTest extends TestCase
         // re-fetch it. A single click that overwrites a selection of them is a
         // one-way door, so the bulk path is links only.
         $this->assertContains('refreshFavicons', $names);
-        $this->assertNotContains('embedFavicons', $names);
+
+        // Matched on shape, not on one spelling. This used to assert against
+        // the literal `embedFavicons`, a name that has never existed — the real
+        // action is `embedFavicon`, singular — so copying it into the toolbar,
+        // which is exactly the door this guards, would have passed unchanged.
+        $this->assertSame(
+            [],
+            array_values(array_filter($names, fn (string $name): bool => str_contains(strtolower($name), 'embed'))),
+        );
     }
 
     public function test_the_bulk_link_action_skips_items_it_cannot_resolve(): void
