@@ -41,12 +41,27 @@ class MenuTransfer
     protected const MAX_STRING_LENGTH = TopbarMenuItem::URL_MAX_LENGTH;
 
     /**
-     * The topbar renders exactly two levels — root items and one level of
-     * children (see menu.blade.php / TopbarMenu::snapshot). Grandchildren would
-     * import "successfully" yet never render and could not be re-parented
-     * through the form, so a deeper tree is rejected instead of silently lost.
+     * A structural bound on the nesting an imported file may declare, so a
+     * hostile one cannot recurse this class until the stack gives out. Not the
+     * rendering depth: that is two levels (see menu.blade.php /
+     * TopbarMenu::snapshot), and no real menu comes close to this number.
+     *
+     * It used to BE two, on the reasoning that grandchildren "would import
+     * successfully yet never render and could not be re-parented through the
+     * form". The second half of that is not true — the parent Select offers
+     * every root, so a buried item can be moved back out — and the first half
+     * is true of rows the package already tolerates: the form creates a third
+     * level whenever a group with children is given a parent of its own, and
+     * scopeTreeOrdered() goes out of its way to list those rows so an admin can
+     * find them.
+     *
+     * What the low bound actually did was break the round trip. export() walks
+     * the whole tree, so a menu with a third level produced a file its own
+     * import refused — taking `create-table --copy-from-default` and the list
+     * page's setup action, the documented way to move a menu onto a dedicated
+     * connection, down with it.
      */
-    protected const MAX_DEPTH = 2;
+    protected const MAX_DEPTH = 10;
 
     /**
      * @return array<string, mixed>
@@ -238,17 +253,22 @@ class MenuTransfer
             }
 
             // `url` becomes an anchor href and `favicon_url` an image source,
-            // both rendered to every panel user; only plain http(s) links are
-            // safe there. filled() lets a dropdown group keep an empty url.
+            // both rendered to every panel user. filled() lets a dropdown group
+            // keep an empty url.
             //
-            // Deliberately stricter than TopbarMenuItem::isRenderableUrl(), the
-            // gate the render path applies: that one exists to stop a stored
-            // value from executing and therefore tolerates the relative links
-            // and `mailto:` a seeder legitimately writes, while an imported file
-            // is third-party input that has no such history to respect. An
-            // import writes what it was given; a renderer renders what it finds.
-            if (filled($item['url'] ?? null) && ! $this->isSafeHttpUrl($item['url'])) {
-                throw new InvalidArgumentException("[{$itemPath}.url] must be a http(s) URL.");
+            // The link is judged by exactly the rule the render path applies,
+            // so the two cannot disagree in either direction: a file this
+            // import accepts is a menu that renders, and a menu this package
+            // produced is a file this import accepts. The rule blocks every
+            // scheme a browser would execute, which is the property that
+            // matters here; "absolute http(s) only" was a shape, not a
+            // safeguard, and it is what made the package's own seeded menu
+            // (`/telescope`, `/horizon`) impossible to export and re-import.
+            if (filled($item['url'] ?? null) && ! TopbarMenuItem::isRenderableUrl($item['url'])) {
+                throw new InvalidArgumentException(
+                    "[{$itemPath}.url] must be a relative link, or use one of these schemes: "
+                    .implode(', ', TopbarMenuItem::LINK_SCHEMES).'.',
+                );
             }
 
             if (filled($item['favicon_url'] ?? null) && ! TopbarMenuItem::isStorableFaviconUrl($item['favicon_url'])) {
@@ -293,34 +313,11 @@ class MenuTransfer
             }
 
             if ($children !== [] && $depth >= self::MAX_DEPTH) {
-                throw new InvalidArgumentException("[{$itemPath}.children] exceeds the maximum menu depth of ".self::MAX_DEPTH.' levels.');
+                throw new InvalidArgumentException("[{$itemPath}.children] exceeds the maximum nesting depth of ".self::MAX_DEPTH.' levels.');
             }
 
             $this->validateItems(array_values($children), "{$itemPath}.children", $depth + 1);
         }
-    }
-
-    /**
-     * A menu link is only safe once rendered into an anchor href if it is a
-     * plain http(s) URL; this blocks `javascript:`/`data:` and scheme-relative
-     * or relative values, matching the resource form's `->url()` rule.
-     */
-    protected function isSafeHttpUrl(string $url): bool
-    {
-        if (! in_array(
-            strtolower((string) parse_url($url, PHP_URL_SCHEME)),
-            ['http', 'https'],
-            true,
-        )) {
-            return false;
-        }
-
-        // The scheme alone is not enough: `http:foo` parses as scheme+path
-        // with no host, so it would pass a scheme-only check while browsers
-        // read the href differently than PHP does — and the
-        // hide_on_current_domain flag could never match it. A real menu link
-        // always names a host.
-        return filled(parse_url($url, PHP_URL_HOST));
     }
 
     /**

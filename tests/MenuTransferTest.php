@@ -5,6 +5,7 @@ namespace Vaslv\FilamentTopbarMenu\Tests;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Vaslv\FilamentTopbarMenu\Database\Seeders\TopbarMenuSeeder;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
 use Vaslv\FilamentTopbarMenu\Support\MenuTransfer;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
@@ -244,19 +245,119 @@ class MenuTransferTest extends TestCase
     {
         return [
             'javascript scheme' => ['javascript:alert(document.cookie)'],
+            'javascript, mixed case' => ['JaVaScRiPt:alert(1)'],
+            // A browser strips tab and newline before it reads the scheme, so
+            // this navigates as `javascript:` while parse_url() sees a path.
+            'javascript, split by a newline' => ["java\nscript:alert(1)"],
             'data scheme' => ['data:text/html,<script>alert(1)</script>'],
-            'scheme-relative' => ['//evil.example.com/x'],
-            'root-relative' => ['/admin/x'],
-            // Not dangerous, but they must stay unreachable through the import
-            // so pointsAtCurrentHost()'s no-host branches remain defensive-only.
-            'mailto scheme' => ['mailto:team@example.com'],
-            'tel scheme' => ['tel:+123456789'],
+            'vbscript scheme' => ['vbscript:msgbox(1)'],
+            'file scheme' => ['file:///etc/passwd'],
             // Scheme without a host: parses as scheme+path, browsers read the
             // href differently than PHP, and the hide_on_current_domain flag
             // could never match it.
             'scheme-only, no host' => ['http:foo'],
             'scheme with empty host' => ['http://'],
         ];
+    }
+
+    /**
+     * Links that are not http(s) and are imported anyway, because the render
+     * path renders them.
+     *
+     * The import used to refuse these on the reasoning that keeping them out
+     * left pointsAtCurrentHost()'s no-host branches defensive-only. That
+     * tidiness cost the round trip: the package's own seeder writes
+     * `/telescope` and `/horizon`, so a seeded menu produced an export its own
+     * import rejected — and with it `create-table --copy-from-default`. The
+     * property worth keeping is the scheme allowlist, and that is unchanged.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function relativeAndNonHttpUrlProvider(): array
+    {
+        return [
+            'root-relative' => ['/admin/x'],
+            'path-relative' => ['reports/monthly'],
+            'scheme-relative' => ['//cdn.example.com/x'],
+            'mailto scheme' => ['mailto:team@example.com'],
+            'tel scheme' => ['tel:+123456789'],
+        ];
+    }
+
+    public function test_a_menu_this_package_produced_survives_its_own_export_and_import(): void
+    {
+        // The invariant the round trip actually needs: whatever the package
+        // writes, it can read back. Anything else takes `create-table
+        // --copy-from-default` and the list page's setup action with it, since
+        // both are an export followed by an import.
+        (new TopbarMenuSeeder)->run();
+
+        $before = $this->transfer()->export();
+        $count = TopbarMenuItem::query()->count();
+
+        $this->transfer()->import($before, replace: true);
+
+        $this->assertSame($count, TopbarMenuItem::query()->count());
+        $this->assertEquals($before, $this->transfer()->export());
+    }
+
+    public function test_a_third_level_survives_the_round_trip(): void
+    {
+        // A third level is reachable through the form — give a group that
+        // already has children a parent of its own — and the items table lists
+        // it on purpose. Export walked it and the import then refused the file
+        // export had just written.
+        $root = TopbarMenuItem::create(['label' => 'Root', 'url' => 'https://a.test']);
+        $mid = TopbarMenuItem::create(['label' => 'Mid', 'url' => 'https://b.test', 'parent_id' => $root->id]);
+        TopbarMenuItem::create(['label' => 'Leaf', 'url' => 'https://c.test', 'parent_id' => $mid->id]);
+
+        $payload = $this->transfer()->export();
+
+        $this->assertArrayHasKey('children', $payload['items'][0]['children'][0]);
+
+        $this->transfer()->import($payload, replace: true);
+
+        $leaf = TopbarMenuItem::query()->where('label', 'Leaf')->firstOrFail();
+
+        $this->assertSame('Mid', $leaf->parent?->label);
+        $this->assertSame('Root', $leaf->parent?->parent?->label);
+    }
+
+    public function test_import_still_refuses_a_tree_nested_past_the_structural_bound(): void
+    {
+        // The bound is a recursion guard, not the rendering depth — but it is
+        // still a bound.
+        $item = ['label' => 'Deep', 'url' => 'https://example.com'];
+
+        for ($level = 0; $level < 12; $level++) {
+            $item = ['label' => "Level {$level}", 'url' => 'https://example.com', 'children' => [$item]];
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('exceeds the maximum nesting depth');
+
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [$item],
+        ]);
+    }
+
+    #[DataProvider('relativeAndNonHttpUrlProvider')]
+    public function test_import_accepts_a_link_the_render_path_renders(string $url): void
+    {
+        $this->transfer()->import([
+            'plugin' => MenuTransfer::PLUGIN,
+            'format' => MenuTransfer::FORMAT,
+            'items' => [
+                ['label' => 'Link', 'url' => $url],
+            ],
+        ]);
+
+        $item = TopbarMenuItem::query()->firstOrFail();
+
+        $this->assertSame($url, $item->url);
+        $this->assertSame($url, $item->resolveUrl(), 'An imported link the menu cannot render is a silent loss.');
     }
 
     #[DataProvider('unsafeUrlProvider')]
@@ -506,32 +607,6 @@ class MenuTransferTest extends TestCase
             ['hide_on_current_domain' => true],
             TopbarMenuItem::query()->sole()->visibility,
         );
-    }
-
-    public function test_import_rejects_a_tree_deeper_than_two_levels(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('[items.0.children.0.children]');
-
-        $this->transfer()->import([
-            'plugin' => MenuTransfer::PLUGIN,
-            'format' => MenuTransfer::FORMAT,
-            'items' => [
-                [
-                    'label' => 'Root',
-                    'url' => 'https://example.com',
-                    'children' => [
-                        [
-                            'label' => 'Child',
-                            'url' => 'https://example.com/child',
-                            'children' => [
-                                ['label' => 'Grandchild', 'url' => 'https://example.com/grandchild'],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ]);
     }
 
     public function test_import_accepts_a_255_character_multibyte_label(): void
