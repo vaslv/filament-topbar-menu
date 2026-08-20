@@ -5,6 +5,7 @@ namespace Vaslv\FilamentTopbarMenu\Tests;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
+use Filament\Facades\Filament;
 use Filament\FilamentServiceProvider;
 use Filament\Forms\FormsServiceProvider;
 use Filament\Infolists\InfolistsServiceProvider;
@@ -29,6 +30,7 @@ use ReflectionProperty;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource;
 use Vaslv\FilamentTopbarMenu\Filament\Resources\TopbarMenuItemResource\Pages;
 use Vaslv\FilamentTopbarMenu\Models\TopbarMenuItem;
+use Vaslv\FilamentTopbarMenu\Tests\Fixtures\RoleAwareUser;
 use Vaslv\FilamentTopbarMenu\TopbarMenu;
 use Vaslv\FilamentTopbarMenu\TopbarMenuPlugin;
 
@@ -1151,5 +1153,75 @@ class PluginTest extends TestCase
 
         $schema->fill(['type' => TopbarMenuItem::TYPE_ROUTE]);
         $this->assertFalse($toggle->isVisible());
+    }
+
+    public function test_the_views_filter_by_visibility_for_the_user_they_are_given(): void
+    {
+        $group = TopbarMenuItem::create([
+            'label' => 'Account',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://account.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Sign in',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://account.example.com/login',
+            'parent_id' => $group->id,
+            'visibility' => ['guest' => true],
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Profile',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://account.example.com/profile',
+            'parent_id' => $group->id,
+            'visibility' => ['auth' => true],
+        ]);
+
+        $items = app(TopbarMenu::class)->visibleItems();
+
+        // Every view render in this suite passed `'user' => null`, so the whole
+        // per-user branch of the views — `visibleChildren($user)` and
+        // `isBranchActive($user)` in both copies — had never executed with a
+        // user. Dropping the argument would leak a guest-only child to signed-in
+        // users, with the suite green.
+        foreach (['filament-topbar-menu::menu', 'filament-topbar-menu::sidebar-items'] as $view) {
+            $asGuest = view($view, ['items' => $items, 'user' => null])->render();
+
+            $this->assertStringContainsString('Sign in', $asGuest, $view);
+            $this->assertStringNotContainsString('Profile', $asGuest, $view);
+
+            $asUser = view($view, ['items' => $items, 'user' => new RoleAwareUser])->render();
+
+            $this->assertStringContainsString('Profile', $asUser, $view);
+            $this->assertStringNotContainsString('Sign in', $asUser, $view);
+        }
+    }
+
+    public function test_the_plugins_render_hook_resolves_the_user_itself(): void
+    {
+        TopbarMenuItem::create([
+            'label' => 'Members only',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://example.com/members',
+            'visibility' => ['auth' => true],
+        ]);
+
+        $panel = Panel::make()->id('hooked')->plugin(TopbarMenuPlugin::make()->mobile(false));
+
+        Filament::setCurrentPanel($panel);
+
+        $hooks = (new ReflectionProperty($panel, 'renderHooks'))->getValue($panel);
+        $render = $hooks[PanelsRenderHook::TOPBAR_LOGO_AFTER][null][0];
+
+        // renderMenu() reads `filament()->auth()->user()` — the one line that
+        // turns "which user" into an answer, and the one nothing reached
+        // because the tests always rendered the view directly.
+        $this->assertStringNotContainsString('Members only', $render()->render());
+
+        $this->actingAs(new RoleAwareUser);
+
+        $this->assertStringContainsString('Members only', $render()->render());
     }
 }
