@@ -154,6 +154,21 @@ class TopbarMenuItemResource extends Resource
                             ->label(static::trans('fields.url.label'))
                             ->placeholder(static::trans('fields.url.placeholder'))
                             ->url()
+                            // Laravel's bare `url` rule accepts a long list of
+                            // schemes — `data://`, `view-source://`, `jar://`
+                            // and dozens more. None of them belongs in a menu
+                            // link, and the form is the guided path: it asks for
+                            // the absolute external URL the field is for, and
+                            // leaves the wider set the renderer tolerates to the
+                            // writers that need it (a seeder, an import).
+                            ->rule('url:http,https')
+                            // The column is VARCHAR(255). Without this a long
+                            // but perfectly valid tracking URL is truncated in
+                            // silence on MySQL in non-strict mode, and a raw
+                            // driver exception — a 500 on the form — everywhere
+                            // else. The import has always enforced this bound;
+                            // the primary write path did not.
+                            ->maxLength(TopbarMenuItem::URL_MAX_LENGTH)
                             ->visible(fn (Get $get): bool => $get('type') === TopbarMenuItem::TYPE_URL)
                             // A dropdown group's own link is never used (the
                             // toggle does not navigate), so an item that already
@@ -191,6 +206,7 @@ class TopbarMenuItemResource extends Resource
                         TextInput::make('icon')
                             ->label(static::trans('fields.icon.label'))
                             ->placeholder(static::trans('fields.icon.placeholder'))
+                            ->maxLength(TopbarMenuItem::URL_MAX_LENGTH)
                             // Escape the translator-controlled text FIRST, then
                             // substitute the hardcoded anchor — so an overridden
                             // or third-party locale stays HTML-inert instead of
@@ -202,6 +218,12 @@ class TopbarMenuItemResource extends Resource
                         TextInput::make('favicon_url')
                             ->label(static::trans('fields.favicon_url.label'))
                             ->url()
+                            // The same two bounds as `url`, and here they are
+                            // also what displayIcon() will demand at render
+                            // time: a value the form accepts but the renderer
+                            // refuses is an icon that silently never appears.
+                            ->rule('url:http,https')
+                            ->maxLength(TopbarMenuItem::URL_MAX_LENGTH)
                             ->suffixAction(
                                 Action::make('fetchFavicon')
                                     ->label(static::trans('actions.fetch_favicon'))
@@ -406,7 +428,20 @@ class TopbarMenuItemResource extends Resource
 
                         TextInput::make('sort')
                             ->label(static::trans('fields.sort.label'))
-                            ->numeric()
+                            // integer(), not numeric(): numeric() adds only the
+                            // `numeric` rule and `step: any`, and nothing casts
+                            // afterwards — the model's `integer` cast applies on
+                            // read, not on write. So `2.5` reached
+                            // `$table->integer('sort')` verbatim: a driver error
+                            // on PostgreSQL and strict MySQL, and on SQLite a
+                            // stored 2.5 that ordered() sorts by and the admin
+                            // can never reproduce through the UI.
+                            ->integer()
+                            // The column's own range. Past it the insert fails
+                            // with a raw overflow error rather than a field
+                            // message.
+                            ->minValue(-2147483648)
+                            ->maxValue(2147483647)
                             ->default(0)
                             ->helperText(static::trans('fields.sort.helper')),
 
