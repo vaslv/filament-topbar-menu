@@ -474,6 +474,10 @@ The bulk **"Fetch favicons"** action stores links only. When an item it resolves
 also carries an embedded icon, the notification says so — the link is stored, but
 the embedded copy is what the topbar keeps showing.
 
+It also stops before PHP's execution limit rather than running into it, and says
+how many of the selection it did not get to. Resolving many items is what the
+artisan command is for; it has no such limit unless you give it `--timeout`.
+
 The artisan command does either:
 
 ```bash
@@ -490,6 +494,10 @@ php artisan filament-topbar-menu:refresh-favicons --id=1 --id=2
 
 # Store the images themselves instead of links:
 php artisan filament-topbar-menu:refresh-favicons --embed
+
+# Stop after a given number of seconds and report what was done, for a deploy
+# script or a scheduler where a run that never ends blocks everything behind it:
+php artisan filament-topbar-menu:refresh-favicons --timeout=120
 ```
 
 `--embed` fills `favicon_data` and reads the same column to decide which items
@@ -511,10 +519,19 @@ return [
     // env variable to a dedicated connection to keep the menu in a separate,
     // possibly shared, database (see "Shared menu across projects" below).
     'connection' => env('FILAMENT_TOPBAR_MENU_DB_CONNECTION') ?: null,
+    // A PREFIX, not the whole key: the connection and the table the menu was
+    // read from are appended, so changing either cannot serve the previous
+    // database's menu until the entry expires.
     'cache_key' => 'filament-topbar-menu.items',
     'cache_ttl' => 3600,
     'enable_favicons' => true,
+    // Timeout of a single outbound request.
     'favicon_request_timeout' => 5,
+    // Wall-clock budget for resolving ONE item, across every request its search
+    // makes — the page, the icons it declares, the conventional locations, and
+    // the redirects any of them follow. Running out is reported as "no favicon
+    // found".
+    'favicon_resolution_timeout' => 20,
     // Cap on an EMBEDDED favicon, applied to the decoded image (see "Favicons").
     'favicon_max_bytes' => 65536,
     // The resource's read-only View page: a `{record}` route, a View row

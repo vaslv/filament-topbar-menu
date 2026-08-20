@@ -5,7 +5,7 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0]
 
 ### Added
 
@@ -56,6 +56,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     variant would pick.
   - **Two new translation keys** (`mobile.open`, `mobile.close`), shipped in all
     13 languages: the accessible labels of the mobile buttons.
+
+- **A wall-clock budget for resolving one favicon**, `favicon_resolution_timeout`
+  (20 seconds). `favicon_request_timeout` bounded a single request; nothing
+  bounded a search, whose worst case is the page plus five declared icons plus
+  six conventional locations, each following up to three redirects — 48 requests
+  for one item. Running out is reported the way a site with no icon is.
+- **`--timeout` on `filament-topbar-menu:refresh-favicons`**, for a deploy script
+  or a scheduler where a run that never ends blocks everything behind it. Absent,
+  the command stays unbounded, which is the point of pointing bulk work at it.
+
+### Changed
+
+- **The bulk "Fetch favicons" action stops before PHP's execution limit** instead
+  of running into it, and reports how many of the selection it did not reach. It
+  used to end as a 500 with part of the selection written and nothing said about
+  the rest. One new translation key (`notifications.favicons_stopped`), in all 13
+  languages.
+- **`cache_key` is now a prefix**: the connection and the table the menu was read
+  from are appended to it. Changing either used to serve the previous database's
+  menu until the entry expired, with no write to flush it, and an app swapping
+  the connection per tenant served whichever tenant wrote the entry first —
+  including that tenant's inactive and role-restricted items, since visibility is
+  applied after the cache. The entry under the old key is orphaned rather than
+  flushed and expires within one `cache_ttl`; the menu is correct immediately.
+- **The menu is resolved once per request** rather than once per rendered copy.
+  The plugin registers two render hooks, so every panel page ran the whole
+  pipeline twice: a cache read, a snapshot validation, and a full rehydration.
+  The service binding moved from `singleton()` to `scoped()`, which is what
+  Octane and the queue worker reset at a request boundary.
+- **The import accepts what the export produces.** It refused trees deeper than
+  two levels while `export()` walked the whole tree, and it demanded an absolute
+  http(s) URL while the package's own seeder writes `/telescope` and `/horizon` —
+  so a menu with a third level, or a seeded menu, produced a file its own import
+  rejected, taking `create-table --copy-from-default` and the list page's setup
+  action with it. The link rule is now the one the render path applies; the depth
+  bound is a recursion guard rather than a rendering rule.
+- **The form bounds `url`, `icon` and `favicon_url` to 255 characters** — the
+  width of the columns behind them — and accepts only `http`/`https` there.
+  `sort` is validated as an integer within the column's range.
+- **`ext-intl` is now declared as a suggestion** and named in the README's
+  requirements. Without it `hide_on_current_domain` stops matching an
+  internationalized domain, and favicons of internationalized domains cannot be
+  resolved at all.
+- **The published package no longer ships `AGENTS.md`, `CLAUDE.md` or
+  `TODOS.md`** — repository instructions and an internal backlog that had been
+  landing in every consumer's vendor directory.
+
+### Fixed
+
+- **A stored `javascript:` link no longer reaches an anchor.** `resolveUrl()`
+  returned the column verbatim, so a row written by a seeder, by hand-written SQL
+  or by a sibling app on a fleet-shared menu table became script execution on
+  click, for every panel user. Escaping does not help: `javascript:` survives it.
+  The gate is an allowlist — `http`, `https`, `mailto`, `tel`, or no scheme —
+  and refuses control characters first, because a browser strips tab and newline
+  before it reads the scheme while `parse_url()` does not.
+- **`favicon_url` is validated at render time**, with the same rule the resolver
+  and the import enforce. It used to be tested only for containing a slash, which
+  let a same-origin path through as an authenticated GET fired from every panel
+  page, and any third-party URL through as a beacon.
+- **The `is_active` toggle and the bulk favicon action now check the policy.**
+  Filament does not consult model policies before an inline editable column
+  saves, and a custom bulk action carries no authorization of its own — so both
+  were open to anyone the `viewAny` policy admitted to the list page.
+- **A misconfigured connection or a cache store that is down no longer takes down
+  every panel page.** `items()` caught only `QueryException`, which covers
+  neither the `InvalidArgumentException` from an undefined connection nor a
+  failing cache store, and `hydrate()` sat outside the guard although it resolves
+  the connection even on a cache hit. `flushCache()` is guarded too: it runs from
+  the model's saved hook, so a store that is down turned every menu write into a
+  500.
+- **The current page is highlighted for a relative link.** `isActive()` compared
+  the whole stored URL against `request()->url()`, so `/telescope` — which the
+  package's own seeder writes — could never match, and the class contradicted
+  itself, since `pointsAtCurrentHost()` called the same item current-host. The
+  comparison is now on paths, which also stops a fragment, a host in another
+  case, an explicit `:443` or `http` against `https` from defeating it.
+- **The favicon resolver no longer rewrites the URL a page declares.** The query
+  string went through the path normaliser with the path, so `?a=/../b` replaced
+  the path it belonged to and a `//` inside a value was collapsed; an empty path
+  segment was dropped, which breaks a Cloudflare image href; and a query-only
+  `href` resolved against the page's directory instead of its path.
+- **The create migration runs outside a transaction**, like the one that adds
+  `favicon_data`. Its duplicate-table recovery re-queries after a failed CREATE,
+  which PostgreSQL answers with SQLSTATE 25P02 inside a transaction — turning the
+  race-safe no-op into a deploy failure in exactly the race it exists for.
+- **`filament-topbar-menu:refresh-favicons` flushes the menu cache once** at the
+  end of a run instead of once per item.
 
 ## [1.11.0]
 
