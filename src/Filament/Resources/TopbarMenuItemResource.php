@@ -774,8 +774,21 @@ class TopbarMenuItemResource extends Resource
                     ->formatStateUsing(fn (string $state): string => static::trans('fields.target.options.'.($state === TopbarMenuItem::TARGET_BLANK ? 'blank' : 'self')))
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                // `disabled()` is the ONLY gate Filament checks before an
+                // inline editable column writes. Its own source says so:
+                // "Inline editable columns (ToggleColumn, TextInputColumn,
+                // SelectColumn, CheckboxColumn) do not automatically check
+                // Laravel Model Policies before saving. Only the disabled()
+                // state is checked." Without this, a user the `viewAny` policy
+                // admits to the list page could flip any item — on a
+                // fleet-shared menu, for every app reading that table.
+                //
+                // The record is bound before isDisabled() is evaluated
+                // (HasColumns::updateTableColumnState), so the closure judges
+                // the row actually being written.
                 ToggleColumn::make('is_active')
-                    ->label(static::trans('columns.is_active')),
+                    ->label(static::trans('columns.is_active'))
+                    ->disabled(fn (TopbarMenuItem $record): bool => ! static::can('update', $record)),
 
                 TextColumn::make('sort')
                     ->label(static::trans('columns.sort'))
@@ -831,10 +844,20 @@ class TopbarMenuItemResource extends Resource
                     // synchronously, inside the web request). The artisan
                     // command covers the bulk case and skips items that already
                     // carry an icon unless --force says otherwise.
+                    // A custom BulkAction carries no authorization of its own —
+                    // Filament's own bulk actions declare theirs, and this one
+                    // has to as well. It persists `favicon_url` on every
+                    // selected record and makes the server fetch third-party
+                    // hosts, so it is an `update` even though it does not look
+                    // like one in the form. authorizeIndividualRecords also
+                    // filters the selection: `$records` reaching the closure is
+                    // already the authorized subset (Action::resolveDefaultClosureDependencyForEvaluationByName),
+                    // and Filament reports the rest as refused.
                     BulkAction::make('refreshFavicons')
                         ->label(static::trans('actions.fetch_favicons'))
                         ->icon('heroicon-m-arrow-path')
                         ->visible(fn (): bool => (bool) config('filament-topbar-menu.enable_favicons', true))
+                        ->authorizeIndividualRecords('update')
                         ->action(fn (Collection $records) => static::resolveFaviconsFor($records))
                         ->deselectRecordsAfterCompletion(),
 
