@@ -1,5 +1,10 @@
 * text=auto
 
+# Keep the published package to what an installing application needs: the code,
+# the config, the migrations, the views, the translations, plus README, LICENSE
+# and CHANGELOG. Everything below is repository furniture — instructions for
+# people and agents working ON the package, and the tooling that checks it —
+# and it would otherwise sit in every consumer's vendor directory.
 /.github export-ignore
 /docs export-ignore
 /tests export-ignore
@@ -8,3 +13,6 @@
 /phpunit.xml export-ignore
 /phpstan.neon.dist export-ignore
 /pint.json export-ignore
+/AGENTS.md export-ignore
+/CLAUDE.md export-ignore
+/TODOS.md export-ignore
