@@ -69,6 +69,33 @@ class TopbarMenuItem extends Model
         'image/bmp',
     ];
 
+    /**
+     * The URL schemes a menu link may carry.
+     *
+     * An allowlist, not a `javascript:` denylist: the point of failure is a
+     * scheme a browser treats as executable, and enumerating those is a losing
+     * game (case, obsolete `vbscript:`, whatever the next engine ships) while
+     * enumerating the ones a menu link legitimately uses is not. `mailto:` and
+     * `tel:` are on it because a menu item pointing at either is an ordinary
+     * thing to want — pointsAtCurrentHost() already reasons about them.
+     *
+     * A link with NO scheme is renderable too, and is not on this list because
+     * it has nothing to match: a relative URL is same-origin by construction,
+     * and this package's own seeder ships two of them (`/telescope`,
+     * `/horizon`).
+     *
+     * @var list<string>
+     */
+    public const LINK_SCHEMES = ['http', 'https', 'mailto', 'tel'];
+
+    /**
+     * The length of every VARCHAR column holding a link or a name — `label`,
+     * `url`, `route`, `icon`, `favicon_url`. One constant because the form, the
+     * import and the favicon resolver all have to agree with the schema, and
+     * three spellings of 255 is how they stop agreeing.
+     */
+    public const URL_MAX_LENGTH = 255;
+
     protected $fillable = [
         'parent_id',
         'label',
@@ -294,7 +321,64 @@ class TopbarMenuItem extends Model
             }
         }
 
-        return $this->url;
+        // Validated on the way out, the way `favicon_data` and `icon` are. The
+        // form and the import both refuse a scheme a browser would execute, but
+        // they are not the only writers this column has: the docblocks on
+        // isStorableFaviconData() and displayIcon() already name the others — a
+        // sibling app on a fleet-shared menu table, a seeder, hand-written SQL —
+        // and this value goes straight into an anchor `href` on every panel
+        // page. Escaping does not help there: `javascript:` survives e() intact
+        // and runs same-origin on click.
+        return static::isRenderableUrl($this->url) ? $this->url : null;
+    }
+
+    /**
+     * Whether a value is a link this package is willing to put in an `href`.
+     *
+     * See LINK_SCHEMES for why the scheme test is an allowlist.
+     */
+    public static function isRenderableUrl(?string $url): bool
+    {
+        if (blank($url)) {
+            return false;
+        }
+
+        // Control characters are refused outright, before the scheme is read.
+        // A browser strips tab, newline and carriage return from a URL BEFORE
+        // it parses the scheme, so a `javascript:` spelled with a newline in
+        // the middle of the word navigates exactly like the plain one, while
+        // parse_url() reads it as a path with no scheme at all. The two
+        // disagreeing is the whole bypass, and no legitimate menu link carries
+        // those bytes.
+        if (preg_match('/[\x00-\x20\x7f]/', $url) === 1) {
+            return false;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        // parse_url() answers false for a string it cannot parse at all.
+        if ($scheme === false) {
+            return false;
+        }
+
+        if ($scheme === null) {
+            // A relative reference. Same-origin by construction, and what this
+            // package's own seeder writes.
+            return true;
+        }
+
+        $scheme = strtolower($scheme);
+
+        if (! in_array($scheme, self::LINK_SCHEMES, true)) {
+            return false;
+        }
+
+        // An http(s) URL must name a host. `http:favicon.ico` parses as
+        // scheme+path, so a scheme-only test would pass it while a browser
+        // reads the href differently than PHP does — and hide_on_current_domain
+        // could never match it. `mailto:`/`tel:` have no host by nature.
+        return ! in_array($scheme, ['http', 'https'], true)
+            || filled(parse_url($url, PHP_URL_HOST));
     }
 
     /**
@@ -625,17 +709,57 @@ class TopbarMenuItem extends Model
             return $this->favicon_data;
         }
 
-        // Only a URL-shaped favicon may reach Filament's icon slot: it renders
-        // a slash-containing string as an <img>, but treats anything else as a
-        // registered icon NAME and throws SvgNotFound — which 500s every panel
-        // page, since the menu renders on all of them. Every write path in this
-        // package stores a URL, so a slash-less value comes from somewhere else:
-        // a fleet-shared menu table written by a sibling app, a seeder, or SQL.
-        if (filled($this->favicon_url) && str_contains($this->favicon_url, '/')) {
+        // The link is validated on the way out too, and against the same rule
+        // the resolver and the import enforce on the way in — not merely tested
+        // for the slash that makes Filament render it as an <img> at all.
+        //
+        // A slash alone was never a safety property. It let `/admin/users/1/delete`
+        // through, which is an authenticated same-origin GET fired from every
+        // panel page of every user, and it let an arbitrary third-party URL
+        // through as a beacon. Neither is script execution — Filament escapes
+        // the attribute (`$icon = e($icon)`) — and neither is something this
+        // package should be emitting either.
+        if (static::isStorableFaviconUrl($this->favicon_url)) {
             return $this->favicon_url;
         }
 
         return static::safeIconName($this->icon);
+    }
+
+    /**
+     * Whether a value is a favicon LINK this package is willing to store and
+     * render: a plain http(s) URL naming a host, within the column limit, with
+     * no character that could break out of an HTML attribute or a CSS `url()`.
+     *
+     * Absolute, unlike a menu link: this value is fetched by every visitor's
+     * browser as an `<img src>` on every panel page, so a relative path here is
+     * an unattended same-origin GET rather than a favicon, and a `mailto:` is
+     * not an image at all.
+     *
+     * The single definition of the rule. The favicon resolver applies it to
+     * what it fetches, the import applies it to an uploaded file, displayIcon()
+     * applies it to what it is about to render — and before this method existed
+     * the three copies had already drifted: one required a host, one did not,
+     * and the length bound was spelled twice with two different literals.
+     */
+    public static function isStorableFaviconUrl(?string $url): bool
+    {
+        if (blank($url) || strlen($url) > self::URL_MAX_LENGTH) {
+            return false;
+        }
+
+        if (! in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+            return false;
+        }
+
+        // The scheme alone is not enough: `http:favicon.ico` parses as
+        // scheme+path with no host, so it would pass a scheme-only check while
+        // browsers read it differently than PHP does.
+        if (blank(parse_url($url, PHP_URL_HOST))) {
+            return false;
+        }
+
+        return preg_match('/[\s"\'<>\\\\]/', $url) === 0;
     }
 
     /**

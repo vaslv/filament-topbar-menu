@@ -739,30 +739,18 @@ class FaviconResolver
     }
 
     /**
-     * Whether a resolved favicon URL is safe to persist and later render. Only
-     * plain http(s) URLs within the storage column limit, with no characters
-     * that could break out of an HTML attribute context (quotes, angle brackets,
-     * whitespace, backslash). Rejects `data:` URIs, which are unbounded in
-     * length.
+     * Whether a resolved favicon URL is safe to persist and later render.
      *
-     * The package renders the value through Filament's icon slot, as an escaped
-     * `<img src>`; the rule stays this strict because a published view may still
-     * put it in a CSS `url('…')` sink, and because a stored value that a browser
-     * parses differently than PHP does is worth refusing on its own.
+     * The rule lives on the model, next to the embedded-favicon gate, because
+     * three places need it: this resolver on the way in, the import on an
+     * uploaded file, and displayIcon() on the way out. Three copies is how they
+     * drift — and they had: this one accepted `http:favicon.ico` (scheme, no
+     * host) that the import refused, and spelled the length bound as a literal
+     * 255 where the import used a named constant.
      */
     protected function isStorableFaviconUrl(string $url): bool
     {
-        if ($url === '' || strlen($url) > 255) {
-            return false;
-        }
-
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            return false;
-        }
-
-        return preg_match('/[\s"\'<>\\\\]/', $url) === 0;
+        return TopbarMenuItem::isStorableFaviconUrl($url);
     }
 
     /**

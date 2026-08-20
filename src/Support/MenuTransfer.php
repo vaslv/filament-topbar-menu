@@ -34,8 +34,11 @@ class MenuTransfer
      *
      * `favicon_data` is exempt — it is a mediumText column holding an embedded
      * image, bounded by `favicon_max_bytes` instead.
+     *
+     * Aliased to the model's constant rather than spelled again: the form, the
+     * schema and the favicon resolver all have to agree on this number.
      */
-    protected const MAX_STRING_LENGTH = 255;
+    protected const MAX_STRING_LENGTH = TopbarMenuItem::URL_MAX_LENGTH;
 
     /**
      * The topbar renders exactly two levels — root items and one level of
@@ -237,11 +240,18 @@ class MenuTransfer
             // `url` becomes an anchor href and `favicon_url` an image source,
             // both rendered to every panel user; only plain http(s) links are
             // safe there. filled() lets a dropdown group keep an empty url.
+            //
+            // Deliberately stricter than TopbarMenuItem::isRenderableUrl(), the
+            // gate the render path applies: that one exists to stop a stored
+            // value from executing and therefore tolerates the relative links
+            // and `mailto:` a seeder legitimately writes, while an imported file
+            // is third-party input that has no such history to respect. An
+            // import writes what it was given; a renderer renders what it finds.
             if (filled($item['url'] ?? null) && ! $this->isSafeHttpUrl($item['url'])) {
                 throw new InvalidArgumentException("[{$itemPath}.url] must be a http(s) URL.");
             }
 
-            if (filled($item['favicon_url'] ?? null) && ! $this->isStorableFaviconUrl($item['favicon_url'])) {
+            if (filled($item['favicon_url'] ?? null) && ! TopbarMenuItem::isStorableFaviconUrl($item['favicon_url'])) {
                 throw new InvalidArgumentException("[{$itemPath}.favicon_url] must be a http(s) URL without quotes, angle brackets or whitespace.");
             }
 
@@ -311,26 +321,6 @@ class MenuTransfer
         // hide_on_current_domain flag could never match it. A real menu link
         // always names a host.
         return filled(parse_url($url, PHP_URL_HOST));
-    }
-
-    /**
-     * Mirror of FaviconResolver::isStorableFaviconUrl: the value is rendered on
-     * every panel page — today as an escaped `<img src>` through Filament's icon
-     * slot, and as a CSS `url('…')` value in any view published before that — so
-     * it must be a bounded http(s) URL with no quotes, angle brackets,
-     * whitespace or backslashes that could break out of either context.
-     */
-    protected function isStorableFaviconUrl(string $url): bool
-    {
-        if ($url === '' || strlen($url) > self::MAX_STRING_LENGTH) {
-            return false;
-        }
-
-        if (! $this->isSafeHttpUrl($url)) {
-            return false;
-        }
-
-        return preg_match('/[\s"\'<>\\\\]/', $url) === 0;
     }
 
     /**
