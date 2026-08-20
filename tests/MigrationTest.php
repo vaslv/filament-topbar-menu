@@ -34,6 +34,23 @@ class MigrationTest extends TestCase
         ]));
     }
 
+    public function test_both_migrations_run_outside_a_transaction(): void
+    {
+        // Both schema helpers recover from a lost race by re-querying after a
+        // failed statement. PostgreSQL aborts the surrounding transaction on
+        // that failure, so inside one the re-check throws SQLSTATE 25P02 and
+        // the race-safe no-op becomes a deploy failure instead. SQLite cannot
+        // reproduce that, so the declaration itself is what gets pinned.
+        foreach (glob(__DIR__.'/../database/migrations/*.php') ?: [] as $path) {
+            $migration = require $path;
+
+            $this->assertFalse(
+                $migration->withinTransaction,
+                basename($path).' must run outside a transaction.',
+            );
+        }
+    }
+
     public function test_the_favicon_data_migration_adds_the_column_to_an_existing_table(): void
     {
         Schema::table('filament_topbar_menu_items', function ($table): void {

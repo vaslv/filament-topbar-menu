@@ -6,6 +6,20 @@ use Vaslv\FilamentTopbarMenu\Support\MenuTableSchema;
 
 return new class extends Migration
 {
+    /**
+     * The duplicate-table recovery inside ensure() has to be able to query
+     * after a failed CREATE. PostgreSQL aborts the whole transaction on that
+     * error, so its re-check would itself throw (SQLSTATE 25P02) and turn the
+     * intended race-safe no-op into a confusing deploy failure — exactly the
+     * race the recovery exists for, since two apps sharing one menu database
+     * hit it on their first deploy. The sibling add_favicon_data migration
+     * carries this for the same reason; the create one was missed.
+     *
+     * Running outside a transaction costs nothing here: a single CREATE TABLE
+     * is atomic on its own.
+     */
+    public $withinTransaction = false;
+
     public function up(): void
     {
         // The schema lives in MenuTableSchema, shared with the create-table
