@@ -102,13 +102,89 @@ class PluginTest extends TestCase
         $panel = Panel::make()->id('test');
 
         TopbarMenuPlugin::make()
-            ->renderHook(PanelsRenderHook::TOPBAR_START)
+            ->renderHook(PanelsRenderHook::TOPBAR_LOGO_BEFORE)
             ->register($panel);
 
         $renderHooks = new ReflectionProperty($panel, 'renderHooks');
 
-        $this->assertArrayHasKey(PanelsRenderHook::TOPBAR_START, $renderHooks->getValue($panel));
+        $this->assertArrayHasKey(PanelsRenderHook::TOPBAR_LOGO_BEFORE, $renderHooks->getValue($panel));
         $this->assertArrayNotHasKey(PanelsRenderHook::TOPBAR_LOGO_AFTER, $renderHooks->getValue($panel));
+    }
+
+    public function test_the_plugin_registers_the_mobile_render_hook(): void
+    {
+        $panel = Panel::make()->id('test');
+
+        TopbarMenuPlugin::make()->register($panel);
+
+        $renderHooks = (new ReflectionProperty($panel, 'renderHooks'))->getValue($panel);
+
+        // The desktop copy is invisible below `lg` — Filament hides the whole
+        // `.fi-topbar-start` container the topbar hook sits in — so the menu is
+        // rendered a second time, as a slide-in panel behind its own button at
+        // the start of the topbar, next to the one that opens the sidebar.
+        $this->assertArrayHasKey(PanelsRenderHook::TOPBAR_START, $renderHooks);
+        $this->assertArrayNotHasKey(PanelsRenderHook::SIDEBAR_NAV_END, $renderHooks);
+    }
+
+    public function test_the_mobile_copy_can_render_in_the_sidebar(): void
+    {
+        $panel = Panel::make()->id('test');
+
+        TopbarMenuPlugin::make()->mobileSidebar()->register($panel);
+
+        $renderHooks = (new ReflectionProperty($panel, 'renderHooks'))->getValue($panel);
+
+        // The in-sidebar variant moves with its default hook: appended to the
+        // panel's own navigation instead of standing next to it in the topbar.
+        $this->assertArrayHasKey(PanelsRenderHook::SIDEBAR_NAV_END, $renderHooks);
+        $this->assertArrayNotHasKey(PanelsRenderHook::TOPBAR_START, $renderHooks);
+    }
+
+    public function test_the_mobile_copy_can_be_disabled(): void
+    {
+        $panel = Panel::make()->id('test');
+
+        TopbarMenuPlugin::make()->mobile(false)->register($panel);
+
+        $renderHooks = (new ReflectionProperty($panel, 'renderHooks'))->getValue($panel);
+
+        $this->assertArrayHasKey(PanelsRenderHook::TOPBAR_LOGO_AFTER, $renderHooks);
+        $this->assertArrayNotHasKey(PanelsRenderHook::TOPBAR_START, $renderHooks);
+    }
+
+    public function test_the_mobile_render_hook_can_be_customized(): void
+    {
+        $panel = Panel::make()->id('test');
+
+        TopbarMenuPlugin::make()
+            ->mobileRenderHook(PanelsRenderHook::SIDEBAR_NAV_START)
+            ->register($panel);
+
+        $renderHooks = (new ReflectionProperty($panel, 'renderHooks'))->getValue($panel);
+
+        // An explicit hook wins over the one the variant would pick.
+        $this->assertArrayHasKey(PanelsRenderHook::SIDEBAR_NAV_START, $renderHooks);
+        $this->assertArrayNotHasKey(PanelsRenderHook::TOPBAR_START, $renderHooks);
+    }
+
+    public function test_the_mobile_variant_picks_its_own_view(): void
+    {
+        $view = new ReflectionMethod(TopbarMenuPlugin::class, 'getMobileView');
+
+        // Placement and markup are chosen by the same switch, but the hook tests
+        // above only see the placement half: swapping the two view strings would
+        // leave every one of them green while the panel rendered sidebar markup
+        // into the topbar.
+        $this->assertSame(
+            'filament-topbar-menu::mobile-menu',
+            $view->invoke(TopbarMenuPlugin::make()),
+        );
+
+        $this->assertSame(
+            'filament-topbar-menu::mobile-sidebar-menu',
+            $view->invoke(TopbarMenuPlugin::make()->mobileSidebar()),
+        );
     }
 
     public function test_the_resource_form_and_table_definitions_build(): void
@@ -479,6 +555,292 @@ class PluginTest extends TestCase
         $this->assertStringContainsString('Linked group', $html);
         $this->assertStringContainsString('href="https://a.example.com/reports"', $html);
         $this->assertStringContainsString('fi-dropdown-list-item', $html);
+    }
+
+    public function test_the_mobile_menu_view_renders_a_second_filament_sidebar(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+            'favicon_url' => 'https://services.example.com/favicon.ico',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://analytics.example.com',
+            'parent_id' => $parent->id,
+            'target' => TopbarMenuItem::TARGET_BLANK,
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Standalone',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://standalone.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Hidden',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://hidden.example.com',
+            'is_active' => false,
+        ]);
+
+        $html = view('filament-topbar-menu::mobile-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // The panel is Filament's own sidebar, not a layout of ours: the same
+        // classes carry the width, the slide-in transition, the offset below the
+        // topbar and the dark mode.
+        $this->assertStringContainsString('class="fi-sidebar fi-topbar-menu-sidebar"', $html);
+        $this->assertStringContainsString("'fi-sidebar-open': isOpen", $html);
+        $this->assertStringContainsString('fi-sidebar-close-overlay', $html);
+        $this->assertStringContainsString('fi-sidebar-nav-groups', $html);
+        $this->assertStringContainsString('fi-sidebar-item', $html);
+        $this->assertStringContainsString('fi-sidebar-group', $html);
+
+        // Its own pair of buttons in the topbar, labelled from the package's own
+        // translations — an unnamed icon button would be all a screen reader got.
+        $this->assertStringContainsString('Open the menu', $html);
+        $this->assertStringContainsString('Close the menu', $html);
+        $this->assertStringContainsString('aria-controls="fi-topbar-menu-sidebar"', $html);
+        $this->assertStringContainsString('id="fi-topbar-menu-sidebar"', $html);
+
+        // A `position: fixed` panel rendered inside the topbar would be trapped
+        // in its stacking context and clipped by its `overflow-x: clip`.
+        $this->assertStringContainsString('x-teleport="body"', $html);
+
+        // Only one slide-in at a time: opening the panel's own sidebar closes
+        // this one, and opening this one closes that.
+        $this->assertStringContainsString('$watch(\'$store.sidebar.isOpen\'', $html);
+        $this->assertStringContainsString('$store.sidebar.close()', $html);
+
+        // The CSS the package ships: the desktop cut-off, and the one rule that
+        // puts this button to the right of the ☰ — Filament offers no render
+        // hook between its sidebar buttons and the logo, so the buttons are
+        // reordered instead.
+        $this->assertStringContainsString('fi-topbar-menu-mobile', $html);
+        $this->assertStringContainsString('@media (min-width: 1024px)', $html);
+        $this->assertStringContainsString('.fi-topbar-open-sidebar-btn', $html);
+        $this->assertStringContainsString('order: -1', $html);
+
+        $this->assertStringContainsString('Standalone', $html);
+        $this->assertStringContainsString('href="https://standalone.example.com"', $html);
+        $this->assertStringNotContainsString('Hidden', $html);
+
+        // The group is a pure toggle, exactly as in the desktop copy: its child
+        // link renders, its own URL never does.
+        $this->assertStringContainsString('href="https://analytics.example.com"', $html);
+        $this->assertStringNotContainsString('href="https://services.example.com"', $html);
+
+        // The per-item target is honored.
+        $this->assertStringContainsString('target="_blank"', $html);
+
+        // The group's favicon renders in the group header.
+        $this->assertStringContainsString('<img src="https://services.example.com/favicon.ico"', $html);
+
+        // The collapsed state is stored per label in one shared Alpine store,
+        // so the key is prefixed — otherwise collapsing a menu group would
+        // collapse a panel navigation group of the same name with it.
+        $this->assertStringContainsString('data-group-label="topbar_menu_Services"', $html);
+    }
+
+    public function test_the_mobile_menu_draws_no_tree_marker_for_an_iconless_child(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Horizon',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/horizon',
+            'favicon_url' => 'https://services.example.com/horizon/img/favicon.png',
+            'parent_id' => $parent->id,
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Plain',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/plain',
+            'parent_id' => $parent->id,
+        ]);
+
+        $html = view('filament-topbar-menu::mobile-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // Filament draws `fi-sidebar-item-grouped-border` — a dot joined by
+        // connecting lines — for a `grouped` child with no icon. In a menu where
+        // only some items carry a favicon that reads as two kinds of marker in
+        // one list, so neither flag is passed: an iconless child renders like it
+        // does in the desktop dropdown, with an empty icon slot.
+        $this->assertStringNotContainsString('fi-sidebar-item-grouped-border', $html);
+
+        // A child that does have a favicon still keeps it.
+        $this->assertStringContainsString('<img src="https://services.example.com/horizon/img/favicon.png"', $html);
+        $this->assertStringContainsString('Plain', $html);
+    }
+
+    public function test_the_mobile_menu_button_marks_an_active_item(): void
+    {
+        TopbarMenuItem::create([
+            'label' => 'Dashboard',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://a.example.com/admin',
+        ]);
+
+        $this->bindRequest('https://a.example.com/admin');
+
+        $html = view('filament-topbar-menu::mobile-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // The menu is closed behind one button on mobile, so the active state
+        // of the page you are on has to survive on the button itself.
+        $this->assertStringContainsString('fi-color-primary', $html);
+        $this->assertStringContainsString('fi-active', $html);
+    }
+
+    public function test_a_child_favicon_survives_in_the_mobile_menu(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Horizon',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/horizon',
+            'favicon_url' => 'https://services.example.com/horizon/img/favicon.png',
+            'parent_id' => $parent->id,
+        ]);
+
+        $html = view('filament-topbar-menu::mobile-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertStringContainsString('<img src="https://services.example.com/horizon/img/favicon.png"', $html);
+    }
+
+    public function test_the_mobile_sidebar_menu_view_renders_filament_sidebar_markup(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+            'favicon_url' => 'https://services.example.com/favicon.ico',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Analytics',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://analytics.example.com',
+            'parent_id' => $parent->id,
+            'target' => TopbarMenuItem::TARGET_BLANK,
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Standalone',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://standalone.example.com',
+        ]);
+
+        $html = view('filament-topbar-menu::mobile-sidebar-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // Filament's own sidebar markup, not markup of ours: this variant sits
+        // among the panel's navigation items and has to look like them.
+        $this->assertStringContainsString('fi-sidebar-nav-groups', $html);
+        $this->assertStringContainsString('fi-sidebar-item', $html);
+        $this->assertStringContainsString('fi-sidebar-group', $html);
+        $this->assertStringContainsString('fi-sidebar-group-items', $html);
+        $this->assertStringNotContainsString('fi-topbar-nav-groups', $html);
+
+        $this->assertStringContainsString('fi-topbar-menu-mobile', $html);
+        $this->assertStringContainsString('@media (min-width: 1024px)', $html);
+
+        $this->assertStringContainsString('href="https://analytics.example.com"', $html);
+        $this->assertStringNotContainsString('href="https://services.example.com"', $html);
+        $this->assertStringContainsString('target="_blank"', $html);
+        $this->assertStringContainsString('<img src="https://services.example.com/favicon.ico"', $html);
+
+        // The collapsed state is stored per label in one shared Alpine store,
+        // so the key is prefixed — otherwise collapsing a menu group would
+        // collapse a panel navigation group of the same name with it.
+        $this->assertStringContainsString('data-group-label="topbar_menu_Services"', $html);
+    }
+
+    public function test_the_mobile_sidebar_menu_draws_no_tree_marker_for_an_iconless_child(): void
+    {
+        $parent = TopbarMenuItem::create([
+            'label' => 'Services',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com',
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Horizon',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/horizon',
+            'favicon_url' => 'https://services.example.com/horizon/img/favicon.png',
+            'parent_id' => $parent->id,
+        ]);
+
+        TopbarMenuItem::create([
+            'label' => 'Plain',
+            'type' => TopbarMenuItem::TYPE_URL,
+            'url' => 'https://services.example.com/plain',
+            'parent_id' => $parent->id,
+        ]);
+
+        $html = view('filament-topbar-menu::mobile-sidebar-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        // Filament draws `fi-sidebar-item-grouped-border` — a dot joined by
+        // connecting lines — for a `grouped` child with no icon. In a menu where
+        // only some items carry a favicon that reads as two kinds of marker in
+        // one list, so neither flag is passed: an iconless child renders like it
+        // does in the desktop dropdown, with an empty icon slot.
+        $this->assertStringNotContainsString('fi-sidebar-item-grouped-border', $html);
+
+        // A child that does have a favicon still keeps it.
+        $this->assertStringContainsString('<img src="https://services.example.com/horizon/img/favicon.png"', $html);
+        $this->assertStringContainsString('Plain', $html);
+    }
+
+    public function test_the_mobile_sidebar_menu_view_renders_nothing_when_there_are_no_items(): void
+    {
+        $html = view('filament-topbar-menu::mobile-sidebar-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertSame('', trim($html));
+    }
+
+    public function test_the_mobile_menu_view_renders_nothing_when_there_are_no_items(): void
+    {
+        $html = view('filament-topbar-menu::mobile-menu', [
+            'items' => app(TopbarMenu::class)->visibleItems(),
+            'user' => null,
+        ])->render();
+
+        $this->assertSame('', trim($html));
     }
 
     public function test_the_menu_view_renders_nothing_when_there_are_no_items(): void

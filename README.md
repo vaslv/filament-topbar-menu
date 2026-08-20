@@ -11,9 +11,10 @@ A [Filament 5](https://filamentphp.com) plugin that adds a configurable menu to 
 - 🖼️ **Icons and favicons** — auto-resolve favicons for external links (never at render time); a favicon replaces the item's icon
 - ⚡ **Cached** — no database query on page render; the cache is flushed automatically on changes
 - 🛠️ **Full Filament resource** — create, edit, delete, drag-and-drop reordering, activate/deactivate
-- 🌙 **Truly Filament-native look** — built from Filament's own topbar/dropdown components, so it's pixel-identical to the panel's `topNavigation()` menu (dark mode, active-item highlight, spacing) with zero custom CSS
+- 🌙 **Truly Filament-native look** — built from Filament's own topbar/dropdown and sidebar components, so it's pixel-identical to the panel's `topNavigation()` menu (dark mode, active-item highlight, spacing); the only CSS the package ships is one media query and the two rules that place the mobile button
+- 📱 **Responsive** — rendered twice: dropdowns in the topbar on desktop, and on mobile a slide-in panel of its own — the panel's own sidebar, down to the class names — opened by its own button next to the ☰, so the menu is never buried below the panel's navigation (an in-sidebar variant is one method call away)
 - 🌍 **Translatable** — ships with 13 languages out of the box (see [Translations](#translations)); add your own
-- 🪝 Rendered through the official `PanelsRenderHook::TOPBAR_LOGO_AFTER` render hook — no layout overrides
+- 🪝 Rendered through the official `PanelsRenderHook::TOPBAR_LOGO_AFTER` and `TOPBAR_START` render hooks — no layout overrides
 
 ## Requirements
 
@@ -75,52 +76,71 @@ TopbarMenuPlugin::make()
 
     // Render the menu at a different panel render hook:
     ->renderHook(\Filament\View\PanelsRenderHook::TOPBAR_START)
+
+    // Drop the mobile copy of the menu (see "Responsive behavior"):
+    ->mobile(false)
+
+    // Put the mobile copy in the panel's own sidebar, below its navigation,
+    // instead of in a slide-in panel of its own:
+    ->mobileSidebar()
+
+    // Render the mobile copy at a different panel render hook:
+    ->mobileRenderHook(\Filament\View\PanelsRenderHook::SIDEBAR_NAV_START)
 ```
 
 ### Responsive behavior
 
-The menu is hidden below the `lg` (1024px) breakpoint, for two independent
-reasons:
+The menu renders **twice** — once for desktop, once for mobile — and each copy is
+hidden where the other one shows. That is not a workaround: it is how Filament
+renders its own `topNavigation()` menu too, because below `lg` it hides the whole
+`.fi-topbar-start` container the desktop copy sits in.
 
-1. The default `TOPBAR_LOGO_AFTER` hook renders it inside Filament's
-   `.fi-topbar-start` region, which Filament itself hides below `lg` — the same
-   as its logo and sidebar controls.
-2. The menu's own root element is `<ul class="fi-topbar-nav-groups">`, Filament's
-   top-navigation list class, which is `hidden lg:flex` in Filament's own CSS.
+| Viewport | Render hook | Markup | Groups |
+| --- | --- | --- | --- |
+| ≥ 1024px (`lg`) | `TOPBAR_LOGO_AFTER` | `<ul class="fi-topbar-nav-groups">` | dropdowns |
+| < 1024px | `TOPBAR_START` | Filament's `fi-sidebar`, behind its own topbar button | collapsible lists |
 
-Because of (2), **changing the render hook alone does not make the menu appear on
-narrow viewports** — at `TOPBAR_START` or `TOPBAR_END` it renders outside
-`.fi-topbar-start`, but its own `<ul>` is still `display: none` below 1024px.
+On mobile the menu becomes **a second sidebar with a button of its own**, sitting
+right next to the ☰ that opens the panel's: same slide-in panel, same width, same
+transition, same offset below the topbar, same dark mode — because it is built
+from Filament's own `fi-sidebar` classes rather than a layout of ours. Two
+buttons, two menus, and you pick which one to open; only one is ever open at a
+time. The button turns primary when the page you are on is in this menu, and
+turns into an ✕ while the menu is open. Tapping a link or the backdrop closes it,
+as does <kbd>Esc</kbd>.
 
-To show it there, register the menu at a hook outside `.fi-topbar-start` and add
-a CSS rule that undoes the hiding. A default install has no stylesheet of its
-own, so inject one from the panel:
+The alternative is `->mobileSidebar()`, which appends the menu to the panel's own
+navigation inside its sidebar instead — one list, no second button. It reads well
+on a panel with a short navigation; on a long one the menu ends up below every
+navigation item and has to be scrolled to, which is why it is not the default.
+Both variants render the same rows, so what you see in one you see in the other.
 
-```php
-use Filament\View\PanelsRenderHook;
+Three details worth knowing:
 
-$panel
-    ->plugin(TopbarMenuPlugin::make()->renderHook(PanelsRenderHook::TOPBAR_END))
-    ->renderHook(
-        PanelsRenderHook::STYLES_AFTER,
-        fn (): string => '<style>.fi-topbar-nav-groups { display: flex; }</style>',
-    );
-```
+- **The CSS the package ships is one media query plus two rules**, and each one
+  is there because Filament's precompiled `theme.css` has no equivalent: it ships
+  only the utilities Filament itself uses, and each of its `lg:fi-hidden` rules is
+  scoped to a specific parent, so nothing there hides an arbitrary element on
+  desktop. The other two rules place the button — Filament offers no render hook
+  between its sidebar buttons and the logo, so the copy renders at `TOPBAR_START`
+  and pulls those buttons one flex slot forward to sit to their right — and put
+  the backdrop one layer below the topbar, so it never covers the ✕ that closes
+  it. All of it is inline in the view: no asset to build, nothing to re-run on an
+  update, and publishing the views (`--tag=filament-topbar-menu-views`) is enough
+  to change any of it.
+- **The panel is teleported to the body.** A `position: fixed` panel rendered
+  inside the topbar would be trapped in its stacking context and clipped by its
+  `overflow-x: clip`; in the body it is also a child of the element carrying
+  `fi-body-has-topbar`, which is what offsets a sidebar below the topbar rather
+  than over it.
+- **A panel with `navigation(false)` has no sidebar at all**, so `->mobileSidebar()`
+  has nothing to render into there. The default slide-in panel is unaffected — it
+  brings its own.
 
-Two things to expect, both coming from Filament's own CSS rather than from this
-package:
-
-- The same class is used by Filament's native top navigation, so on a panel with
-  `topNavigation()` the rule un-hides that menu below `lg` as well.
-- Filament puts `flex-wrap` and the row gap inside its `lg` media query, so below
-  that width the menu is a single non-wrapping row inside `.fi-topbar-ctn`, which
-  clips horizontal overflow. Add `flex-wrap: wrap` to the rule (or keep the menu
-  short) if your items do not fit.
-
-Utility classes (`flex`, `items-center`, …) are not an option here: Filament's
-precompiled theme contains only its own `.fi-*` rules, so utilities exist only in
-panels with a custom Filament theme whose Tailwind build scans the published
-views.
+Turn the mobile copy off with `->mobile(false)`. The case for it: a panel that
+moved the desktop menu to a hook of its own outside `.fi-topbar-start` (e.g.
+`TOPBAR_END`) **and** un-hid `.fi-topbar-nav-groups` with a CSS rule of its own
+would otherwise show both copies at once below `lg`.
 
 ## Managing menu items
 

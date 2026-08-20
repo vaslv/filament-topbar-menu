@@ -6,6 +6,14 @@
 @endphp
 
 @if ($items->isNotEmpty())
+    {{-- The desktop copy of the menu. Filament hides `.fi-topbar-nav-groups`
+         below `lg`, and hides the `.fi-topbar-start` container this render hook
+         sits in on top of that, so the mobile copy is rendered separately — as a
+         slide-in panel behind its own topbar button (`mobile-menu.blade.php`),
+         or inside the panel's own sidebar (`mobile-sidebar-menu.blade.php`).
+         Editing one copy without the other leaves the menu different on phones
+         than on desktops; the rows of both mobile variants live in
+         `sidebar-items.blade.php`. --}}
     <ul class="fi-topbar-nav-groups">
         @foreach ($items as $item)
             @php

@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Copy skipped: the default connection has no menu table to copy from.',
     ],
 
+    'mobile' => [
+        'open' => 'Open the menu',
+        'close' => 'Close the menu',
+    ],
+
 ];

@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Cópia ignorada: a conexão padrão não tem tabela de menu para copiar.',
     ],
 
+    'mobile' => [
+        'open' => 'Abrir o menu',
+        'close' => 'Fechar o menu',
+    ],
+
 ];

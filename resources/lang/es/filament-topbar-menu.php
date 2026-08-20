@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Copia omitida: la conexión predeterminada no tiene tabla de menú desde la que copiar.',
     ],
 
+    'mobile' => [
+        'open' => 'Abrir el menú',
+        'close' => 'Cerrar el menú',
+    ],
+
 ];

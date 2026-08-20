@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Kopyalama atlandı: varsayılan bağlantıda kopyalanacak bir menü tablosu yok.',
     ],
 
+    'mobile' => [
+        'open' => 'Menüyü aç',
+        'close' => 'Menüyü kapat',
+    ],
+
 ];

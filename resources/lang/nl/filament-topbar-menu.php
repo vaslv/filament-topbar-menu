@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Kopiëren overgeslagen: de standaardverbinding heeft geen menutabel om uit te kopiëren.',
     ],
 
+    'mobile' => [
+        'open' => 'Menu openen',
+        'close' => 'Menu sluiten',
+    ],
+
 ];

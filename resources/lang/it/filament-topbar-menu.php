@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Copia saltata: la connessione predefinita non ha una tabella del menu da cui copiare.',
     ],
 
+    'mobile' => [
+        'open' => 'Apri il menu',
+        'close' => 'Chiudi il menu',
+    ],
+
 ];

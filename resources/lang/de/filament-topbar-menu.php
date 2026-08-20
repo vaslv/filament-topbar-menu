@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Kopieren übersprungen: Auf der Standardverbindung gibt es keine Menütabelle zum Kopieren.',
     ],
 
+    'mobile' => [
+        'open' => 'Menü öffnen',
+        'close' => 'Menü schließen',
+    ],
+
 ];

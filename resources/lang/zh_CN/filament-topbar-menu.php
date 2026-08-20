@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => '已跳过复制：默认连接上没有可供复制的菜单表。',
     ],
 
+    'mobile' => [
+        'open' => '打开菜单',
+        'close' => '关闭菜单',
+    ],
+
 ];

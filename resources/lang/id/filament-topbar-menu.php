@@ -155,4 +155,9 @@ return [
         'copy_skipped_no_source' => 'Penyalinan dilewati: koneksi bawaan tidak memiliki tabel menu untuk disalin.',
     ],
 
+    'mobile' => [
+        'open' => 'Buka menu',
+        'close' => 'Tutup menu',
+    ],
+
 ];

@@ -5,6 +5,58 @@ All notable changes to `filament-topbar-menu` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The menu now renders on mobile.** Below Filament's `lg` breakpoint (1024px)
+  the menu was simply not there: the `TOPBAR_LOGO_AFTER` hook it renders into
+  sits inside `.fi-topbar-start`, which Filament hides on narrow viewports, and
+  the menu's own `<ul class="fi-topbar-nav-groups">` is `hidden lg:flex` in
+  Filament's CSS on top of that — so no render-hook change alone could bring it
+  back. It is now rendered a second time, at `PanelsRenderHook::TOPBAR_START`,
+  with each copy hidden where the other one shows.
+  - **A second sidebar with a button of its own**, next to the ☰ that opens the
+    panel's: the same slide-in panel, width, transition, offset below the topbar
+    and dark mode, because it is built from Filament's own `fi-sidebar` classes
+    rather than a layout of ours. Two buttons, two menus, and only one open at a
+    time — the menu is never below the panel's navigation, where a long
+    navigation would leave it to be scrolled to. The button turns primary when
+    the page you are on is in this menu and into an ✕ while the menu is open;
+    a link, the backdrop or `Esc` closes it.
+  - **An in-sidebar variant** is one call away: `->mobileSidebar()` appends the
+    menu to the panel's own navigation instead, as one list. Worth it on a panel
+    with a short navigation, where one list reads better than two menus.
+  - **Rows are Filament's own sidebar items** in both variants, so the menu
+    matches the panel's navigation exactly: same spacing, active-item highlight,
+    dark mode, and the native "tap a link, the menu closes" behavior. A group
+    becomes a collapsible list (the dropdown of the desktop copy), keeping its
+    own icon or favicon and remembering its collapsed state the way Filament's
+    navigation groups do — under a prefixed key, so collapsing a menu group never
+    collapses a panel navigation group of the same name.
+  - **No tree markers.** Filament draws a dot joined by connecting lines in place
+    of a missing icon for a *grouped* sidebar item; in a menu where only some
+    items carry a favicon that reads as two kinds of marker in one list, so an
+    iconless child keeps an empty icon slot, the way it does in the desktop
+    dropdown. Favicons, of course, survive.
+  - **One media query and two rules are the only CSS the package ships.**
+    Filament's precompiled theme carries only the utilities Filament itself uses,
+    and every `lg:fi-hidden` rule in it is scoped to a specific parent, so nothing
+    there hides an arbitrary element on desktop. The other two rules place the
+    button to the right of the ☰ — Filament offers no render hook between its
+    sidebar buttons and the logo, so the copy renders before them and pulls them
+    one flex slot forward — and keep the backdrop one layer below the topbar, so
+    it never covers the ✕ that closes it. All of it is inline in the view: no
+    asset to build, nothing to re-run on an update, and publishing the views is
+    enough to change any of it.
+  - **Three new plugin methods:** `->mobile(false)` drops the mobile copy — for
+    a panel that already un-hides the topbar copy below `lg` with CSS of its
+    own — `->mobileSidebar()` switches to the in-sidebar variant, and
+    `->mobileRenderHook()` moves the copy anywhere, winning over the hook the
+    variant would pick.
+  - **Two new translation keys** (`mobile.open`, `mobile.close`), shipped in all
+    13 languages: the accessible labels of the mobile buttons.
+
 ## [1.11.0]
 
 ### Added
