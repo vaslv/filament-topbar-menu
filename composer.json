@@ -25,7 +25,7 @@
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.18",
         "orchestra/testbench": "^10.0|^11.0",
-        "phpunit/phpunit": "^11.5|^12.0"
+        "phpunit/phpunit": "^13.4.6"
     },
     "suggest": {
         "ext-intl": "Punycode/IDN host matching: without it hide_on_current_domain stops hiding an internationalized domain, and favicons of internationalized domains cannot be resolved at all."
